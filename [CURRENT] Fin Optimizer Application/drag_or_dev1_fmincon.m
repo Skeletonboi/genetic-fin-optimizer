@@ -3,7 +3,6 @@ load('velocityprofile.mat','yeet')
 Cd_out = NaN(1,5800);
 Cd_incomp_out = NaN(1,5800);
 
-yeet = [VelocityProfile.Mach];
 for i = 1:5800
     [Cd_out(i),Cd_incomp_out(i)] = drag(yeet(i));
 end
@@ -11,10 +10,10 @@ end
 hold on
 plot(yeet,Cd_out)
 plot(yeet,Cd_incomp_out)
+legend("Comp","Incomp")
 hold off
 
 area = num_int(Cd_out)
-length(yeet)
 
 function a = num_int(vec)
 h = 1; %dx size
@@ -77,11 +76,11 @@ if Re < 10^4
 elseif Re < Rc
     Cf = 1/((1.5*log(Re)-5.6)^2);
 elseif Re > Rc
-    Cf = 0.032*((5*10^-6)/L_r)^0.2
+    Cf = 0.032*((5*10^-6)/L_r)^0.2;
 end
 %Compressibility Corrections
 if V < Ma
-    Cfc = Cf*(1-0.1*M^2)
+    Cfc = Cf*(1-0.1*M^2);
 elseif V > Ma
     turb = Cf/((1+0.15*M^2)^0.58);
     rough = Cf/(1+0.18*M^2);
@@ -97,8 +96,7 @@ elseif V > Ma
 end
 
 %Skin Friction Drag Coefficient
-Cfc
-Cdf = (Cfc*((1+(2*F_w)/MAC)*6*Afe))/Aref
+Cdf = (Cfc*((1+(2*F_w)/MAC)*6*Afe))/Aref;
 
 % Fin Pressure Drag Coefficient
 % firstly, the leading edge pressure drag (assuming rounded leading edge):
