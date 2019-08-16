@@ -1,5 +1,5 @@
-velprof = ('velocityprofile.mat') 
-atm = load('atmostable.mat')
+velprof = load('velocityprofile.mat') ;
+atm = load('atmostable.mat');
 
 X0 = [0.1;0.1;0.1;0.1]; %Initial Conditions for [a,b,m,s]
 A = [-0.75,1,0,0;
@@ -15,7 +15,7 @@ UB = [0.3;0.3;0.3;0.3];
 % FUN = Fin Drag Equation (Subsonic)
             
 % M = CP_FINAL(app,X);
-FinDragCoefficient = drag(X);
+FinDragCoefficient = drag(X,velprof,rocket_constants);
             
 RootChord = X(1);
 TipChord = X(2);
@@ -50,23 +50,27 @@ F_w = 0.00381;    % Fin Width (Thickness)
 F_fl = 0.21895; % Fin Front Length
 Cg = 3.372354308; %Centre of Gravity
 
-rho = @(h) atm(1,1)
 
-value_rocket = {L_n,L_r,L_z,N,Cn_n,t,X_tc,L_red,D_noz,D_nos,D_end,F_w,F_fl,Cg} % <- TBD: MOVING CG WRT ALTITUDE/MACH
-value_atmos = {rho,Ma,mu,nu} % <-- TBD: NEED LOOK-UP TABLE WRT ALTITUDE/MACH
+rho = @(h) atm.atmosalt(round(h/100),4);
+Ma = @(h) atm.atmosalt(round(h/100),5);
+mu = @(h) atm.atmosalt(round(h/100),6); % Dynamic Viscosity of Air (~1.8e-5)
+nu = @(h) (atm.atmosalt(round(h/100),6))/(atm.atmosalt(round(h/100),4)); % Kinematic Viscosity (Dyn.Visc./Density)
 
-rocket_constants = struct("rocket",value_rocket,"atmos",value_atmos)
+value_rocket = {L_n,L_r,L_z,N,Cn_n,t,X_tc,L_red,D_noz,D_nos,D_end,F_w,F_fl,Cg}; % <- TBD: MOVING CG WRT ALTITUDE/MACH
+value_atmos = {rho(h),Ma(h),mu(h),nu(h)};
+
+rocket_constants = struct("r",value_rocket,"a",value_atmos)
 
 
-% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function F = drag(X,velocity_profile)
+function F = drag(X,vp,rc)
            
-            n = length(velocity_profile.atmosalt);
+            n = length(vp.VelocityProfile);
             Cd_out = NaN(1,n);
             Cd_incomp_out = NaN(1,n);
             for i = 1:n
-                [Cd_out(i),Cd_incomp_out(i)] = drag_AC(X,velocity_profile.(i));
+                [Cd_out(i),Cd_incomp_out(i)] = drag_OR(X,vp.VelocityProfile(i),rc);
             end
             
             F = num_int(Cd_out);
@@ -83,29 +87,14 @@ end
 end
 
 
-function [Cd,Cd_incomp] = drag_OR(X,M)
+function [Cd,Cd_incomp] = drag_OR(X,M,rc)
 % Interference Drag and Fin-Tip Vortices are ignored as they are considered
 % "relatively small"
 % Also assumed a fully turbulent boundary layer
-% Constants (all dimensions in meters):
-L_n = 0.548;    % Nose Length
-F_r = 0.406;    % Fin Root Chord
-F_t = 0.127;    % Fin Tip Chord
-F_s = 0.152;    % Fin Semi-Span
-S = 0.100;      % Sweep Distance
-L_r = 5.844;    % Rocket Length
-L_z = 0.0762;   % Nozzle Length
-N = 3;          % # of fins
-Cn_n = 0.5;     % Nose Cone Coefficient
-t = 0.00635;    % Max Fin Root Thickness
-X_tc = 0.00635; % Distance from Fin Leading Edge to Max Thickness
-L_red = 0.05995;% Length Reduction @ back
-D_noz = 0.08204;% Nozzle Diameter
-D_nos = 0.140;  % Nose Base Diameter
-D_end = 0.1077; % End Diameter
-F_w = 0.00381;  % Fin Thickness
-F_fl = 0.21895; % Fin Front Length
-Cg = 3.372354308; %Centre of Gravity 
+
+rc(1).r
+
+% TO DO: dismember rc struct into values
 
 % Geometric Dimensions
 Afe = (1/2)*(X(1)+X(2))*X(4);
