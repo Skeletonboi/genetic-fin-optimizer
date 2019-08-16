@@ -19,16 +19,16 @@ F_fl = 0.21895; %13. Fin Front Length
 Cg = 3.37235431;%14. Centre of Gravity
 
 
-rho = @(h) atm.atmosalt(round(h/100),4);%1. Density
-Ma = @(h) atm.atmosalt(round(h/100),5); %2. Speed of Sound
-mu = @(h) atm.atmosalt(round(h/100),6); %3. Dynamic Viscosity of Air (~1.8e-5)
-nu = @(h) (atm.atmosalt(round(h/100),6))/(atm.atmosalt(round(h/100),4)); % 4. Kinematic Viscosity (Dyn.Visc./Density)
+rho = @(h) atm.atmosalt(round(h/100)+1,4);%1. Density
+Ma = @(h) atm.atmosalt(round(h/100)+1,5); %2. Speed of Sound
+mu = @(h) atm.atmosalt(round(h/100)+1,6); %3. Dynamic Viscosity of Air (~1.8e-5)
+nu = @(h) (atm.atmosalt(round(h/100)+1,6))/(atm.atmosalt(round(h/100)+1,4)); % 4. Kinematic Viscosity (Dyn.Visc./Density)
 
 value_rocket = {L_n,L_r,L_z,N,Cn_n,t,X_tc,L_red,D_noz,D_nos,D_end,F_w,F_fl,Cg}; % <- TBD: MOVING CG WRT ALTITUDE/MACH
 value_atmo = {rho,Ma,mu,nu};
 
-struct_rocket = struct("r",value_rocket)
-struct_atmo = struct("a",value_atmo)
+struct_rocket = struct("r",value_rocket);
+struct_atmo = struct("a",value_atmo);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 X0 = [0.1;0.1;0.1;0.1]; %Initial Conditions for [a,b,m,s]
@@ -41,11 +41,10 @@ Beq = [];
 LB = [0;0;-0.3;0];
 UB = [0.3;0.3;0.3;0.3];
 %OPTIONS = optimoptions('fmincon','Algorithm','interior-point');
-%X = fmincon(@(X) drag(X),X0,A,B,Aeq,Beq,LB,UB,@(X) NONLCON(X))
+X = fmincon(@(X) drag(X,vp,struct_rocket,struct_atmo),X0,A,B,Aeq,Beq,LB,UB,@(X) NONLCON(X))
 % FUN = Fin Drag Equation (Subsonic)
             
 % M = CP_FINAL(app,X);
-X = [0.2,0.2,0.2,0.2]
 FinDragCoefficient = drag(X,vp,struct_rocket,struct_atmo);
             
 RootChord = X(1);
@@ -92,7 +91,7 @@ D_nos = str_r(10).r;
 F_w = str_r(12).r;
 N = str_r(4).r;
 L_r = str_r(2).r;
-Ma = str_a(2).a;
+Ma = str_a(2).a(alt);
 
 % Geometric Dimensions
 Afe = (1/2)*(X(1)+X(2))*X(4);
@@ -104,7 +103,7 @@ MAC = X(1)*(2/3)*((1+tr+tr^2)/(1+tr));
 Aref = N*(F_w*X(4));
 
 %REYNOLDS NUMBER CALCULATION
-V = M*str_a(2).a(alt); %Instantaneous speed of rocket
+V = M*Ma; %Instantaneous speed of rocket
 mu = str_a(3).a(alt);
 Rc = 51*((5*10^-6)/L_r)^-1.039;
 
@@ -115,7 +114,7 @@ if Re < 10^4
     Cf = 1.48*(10^-2);
 elseif Re < Rc
     Cf = 1/((1.5*log(Re)-5.6)^2);
-elseif Re > Rc
+elseif Re > Rcm 
     Cf = 0.032*((5*10^-6)/L_r)^0.2;
 end
 %Compressibility Corrections
@@ -253,27 +252,14 @@ function [Cd,Cd_alpha] = drag_AC(X,M)
             
 end
 
-function [margin_final] = CP_barrow(X)
+function [cop] = CP_barrow(X,vp,str_r,str_a)
 % CURRENTLY IMPLEMENTED AS BARROWMAN METHOD
-            % Constants (all dimensions in meters):
-            L_n = 0.548;    % Nose Length
-            F_r = 0.406;    % Fin Root Chord
-            F_t = 0.127;    % Fin Tip Chord
-            F_s = 0.152;    % Fin Semi-Span
-            S = 0.100;      % Sweep Distance
-            L_r = 5.844;    % Rocket Length
-            L_z = 0.0762;   % Nozzle Length
-            N = 3;          % # of fins
-            Cn_n = 0.5;     % Nose Cone Coefficient
-            t = 0.00635;    % Max Fin Root Thickness
-            X_tc = 0.00635; % Distance from Fin Leading Edge to Max Thickness
-            L_red = 0.05995;% Length Reduction @ back
-            D_noz = 0.08204;% Nozzle Diameter
-            D_nos = 0.140;  % Nose Base Diameter
-            D_end = 0.1077; % End Diameter
-            F_w = 0.00381;  % Fin Width (Thickness)
-            F_fl = 0.21895; % Fin Front Length
-            Cg = 3.372354308; %Centre of Gravity
+            L_n = str_r(1).r;
+            L_red = str_r(8).r;
+            D_nos = str_r(10).r;
+            D_end = str_r(11).r;
+            L_r = str_r(2).r;
+            N = str_r(4).r;
             
             % X (distance from nose tip to component's Cp):
             % NOTE: Normal Body and Shoulder Forces are neglected
@@ -292,39 +278,26 @@ function [margin_final] = CP_barrow(X)
             l =  (L_r-X(1))-L_red;
             int = 1+ (D_nos/2)/(X(4)+(D_nos/2));
             c =  int*(4*N*(X(4)/D_nos)^2)/(1+sqrt(1+(2*mid/(X(1)+X(2)))^2));
-            x =  l+ (X(3)*(X(1)+2*X(2)))/(3*(X(1)+X(2))) + (1/6)*(X(1)+X(2)-(X(1)*X(2))/(X(1)+X(2)));
-            cp =  ((Cn_n*X_n)+(Cn_b*X_b)+(c*x))/(Cn_n + Cn_b + c);
+            x_fin =  l+ (X(3)*(X(1)+2*X(2)))/(3*(X(1)+X(2))) + (1/6)*(X(1)+X(2)-(X(1)*X(2))/(X(1)+X(2)));
+            cop =  ((Cn_n*X_n)+(Cn_b*X_b)+(c*x_fin))/(Cn_n + Cn_b + c);
             
-            margin_final = (cp-Cg)/D_nos;
+            
             
         end
         
-        function [C,Ceq] = NONLCON(X)
+        function [C,Ceq] = NONLCON(X,vp,str_r,str_a)
+            D_nos = str_r(10).r;
+
             C = [];
-            % Constants (all dimensions in meters):
-            L_n = 0.548;    % Nose Length
-            F_r = 0.406;    % Fin Root Chord
-            F_t = 0.127;    % Fin Tip Chord
-            F_s = 0.152;  % Fin Semi-Span
-            S = 0.100;      % Sweep Distance
-            L_r = 5.844;  % Rocket Length
-            L_z = 0.0762;   % Nozzle Length
-            N = 3;          % # of fins
-            Cn_n = 0.5;     % Nose Cone Coefficient
-            t = 0.00635;    % Max Fin Root Thickness
-            X_tc = 0.00635; % Distance from Fin Leading Edge to Max Thickness
-            L_red = 0.05995;% Length Reduction @ back
-            D_noz = 0.08204;% Nozzle Diameter
-            D_nos = 0.140;  % Nose Base Diameter
-            D_end = 0.1077; % End Diameter
-            F_w = 0.00381;    % Fin Width (Thickness)
-            F_fl = 0.21895; % Fin Front Length
-            Cg = 3.372354308; %Centre of Gravity
-            
-            cp = CP_barrow(X);
-            
-            margin = (cp-Cg)/D_nos;
+            Ceq = [0];
+            cop = CP_barrow(X,vp,str_r,str_a);
+            for i = 1:6001
+                margin = (cop-vp.altmachcg(i,2)/D_nos);
+                marg_resid = max(margin)
+                Ceq(1) = Ceq(1) + 
+            margin = (cop-Cg)/D_nos;
             Ceq = [margin-2];
+            end
             
         end
         

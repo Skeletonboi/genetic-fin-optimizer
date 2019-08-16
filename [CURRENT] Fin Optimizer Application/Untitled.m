@@ -1,2 +1,2 @@
-test = load('altmachcg.mat')
-test
+vp = load('altmachcg.mat')
+disp(vp.altmachcg(3,3))
