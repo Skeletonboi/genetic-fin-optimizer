@@ -1,4 +1,2 @@
-store = @(v) v^2
-temp = struct('test',store)
-
-temp.test(1,2)
+test = load('altmachcg.mat')
+test
