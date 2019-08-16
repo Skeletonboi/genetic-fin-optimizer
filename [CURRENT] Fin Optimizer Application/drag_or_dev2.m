@@ -1,4 +1,6 @@
 load('velocityprofile.mat','yeet') 
+load('atmosalt.mat','atmostable')
+
 X0 = [0.1;0.1;0.1;0.1]; %Initial Conditions for [a,b,m,s]
 A = [-0.75,1,0,0;
     %0,-0.9,1,0;
@@ -47,12 +49,26 @@ F_w = 0.00381;    % Fin Width (Thickness)
 F_fl = 0.21895; % Fin Front Length
 Cg = 3.372354308; %Centre of Gravity
 
+rho = @(h) atmostable(
 
-           
+value_atmos = {rho,Ma,mu,nu} % <-- TBD: NEED LOOK-UP TABLE WRT ALTITUDE/MACH          
 value_rocket = {L_n,L_r,L_z,N,Cn_n,t,X_tc,L_red,D_noz,D_nos,D_end,F_w,F_fl,Cg} % <- TBD: MOVING CG WRT ALTITUDE/MACH
-value_atmos = {rho,Ma,mu,nu} % <-- TBD: NEED LOOK-UP TABLE WRT ALTITUDE/MACH
 
-rocket_constants = struct("rocket",value_rocket,"atmos",value_atmos)
+
+constants = struct("rocket",value_rocket,"atmos",value_atmos)
+
+
+% %Constant Retreival Format (example):
+% rho = @(v) v^2;
+% nu = @(v) v^3;
+% store = {rho,nu};
+% temp = struct('test',store);
+% 
+% temp(2).test(5)   <--- IMPORTANT
+% ie. constants(4).rocket
+% constants(1).atmos(v)
+
+
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%    
 % SWEEP_DRAG RELATIONSHIP TESTING
 % TEST = [0.1,0.1,0.1,0.1];
@@ -80,17 +96,18 @@ rocket_constants = struct("rocket",value_rocket,"atmos",value_atmos)
 %area = num_int(Cd_out)
 
 function F = drag(X)
-            load('velocityprofile.mat','yeet');
+    load('velocityprofile.mat','yeet');
             
-            n = length(yeet);
-            Cd_out = NaN(1,n);
-            Cd_incomp_out = NaN(1,n);
-            for i = 1:n
-                [Cd_out(i),Cd_incomp_out(i)] = drag_AC(X,yeet(i));
-            end
+    n = length(yeet);
+    Cd_out = NaN(1,n);
+    Cd_incomp_out = NaN(1,n);
+     for i = 1:n
+         [Cd_out(i),Cd_incomp_out(i)] = drag_AC(X,yeet(i));
+     end
             
-            F = num_int(Cd_out);
-        end
+     F = num_int(Cd_out);
+end
+
 function a = num_int(vec)
 h = 1; %dx size
 a = 0;
