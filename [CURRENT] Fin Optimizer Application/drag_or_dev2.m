@@ -60,10 +60,11 @@ xlim([0,0.3]);
 ylim([0,0.3]);
 
 function F = drag(X,vp,str_r,str_a)        
-    n = length(vp.altmachcg);
-    Cd_out = NaN(1,6001);
-    Cd_incomp_out = NaN(1,6001);
-    for i = 1:6001
+   % n = length(vp.altmachcg);
+    n = 6001;
+    Cd_out = NaN(1,n);
+    Cd_incomp_out = NaN(1,n);
+    for i = 1:n
         [Cd_out(i),Cd_incomp_out(i)] = drag_OR(X,vp.altmachcg(i,3),vp.altmachcg(i,1),str_r,str_a);
     end         
     F = num_int(Cd_out);
@@ -284,15 +285,21 @@ end
         
         function [C,Ceq] = NONLCON(X,vp,str_r,str_a)
             D_nos = str_r(10).r;
-
+            
             C = [];
             Ceq = [0];
             cop = CP_barrow(X,vp,str_r,str_a);
             
-            for i = 1:6001
+            %n = length(vp.altmachcg);
+            n = 6001;
+            for i = 1:n
                 margin = (cop-vp.altmachcg(i,2)/D_nos);
                 marg_resid = max([margin,2])-min([margin,2]);
-                Ceq(1) = Ceq(1) + marg_resid;
+                if margin < 2
+                    Ceq(1) = Ceq(1) + 100*marg_resid;
+                elseif margin >= 2
+                    Ceq(1) = Ceq(1) + marg_resid;
+                end
             end          
         end
         

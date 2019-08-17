@@ -41,7 +41,7 @@ Beq = [];
 LB = [0;0;-0.3;0];
 UB = [0.3;0.3;0.3;0.3];
 %OPTIONS = optimoptions('fmincon','Algorithm','interior-point');
-X = fmincon(@(X) drag(X,vp,struct_rocket,struct_atmo),X0,A,B,Aeq,Beq,LB,UB,@(X) NONLCON(X))
+X = fmincon(@(X) drag(X,vp,struct_rocket,struct_atmo),X0,A,B,Aeq,Beq,LB,UB,@(X) NONLCON(X,vp,struct_rocket,struct_atmo))
 % FUN = Fin Drag Equation (Subsonic)
             
 % M = CP_FINAL(app,X);
@@ -60,10 +60,11 @@ xlim([0,0.3]);
 ylim([0,0.3]);
 
 function F = drag(X,vp,str_r,str_a)        
-    n = length(vp.altmachcg);
-    Cd_out = NaN(1,6001);
-    Cd_incomp_out = NaN(1,6001);
-    for i = 1:6001
+   % n = length(vp.altmachcg);
+    n = 6001;
+    Cd_out = NaN(1,n);
+    Cd_incomp_out = NaN(1,n);
+    for i = 1:n
         [Cd_out(i),Cd_incomp_out(i)] = drag_OR(X,vp.altmachcg(i,3),vp.altmachcg(i,1),str_r,str_a);
     end         
     F = num_int(Cd_out);
@@ -279,25 +280,27 @@ function [cop] = CP_barrow(X,vp,str_r,str_a)
             int = 1+ (D_nos/2)/(X(4)+(D_nos/2));
             c =  int*(4*N*(X(4)/D_nos)^2)/(1+sqrt(1+(2*mid/(X(1)+X(2)))^2));
             x_fin =  l+ (X(3)*(X(1)+2*X(2)))/(3*(X(1)+X(2))) + (1/6)*(X(1)+X(2)-(X(1)*X(2))/(X(1)+X(2)));
-            cop =  ((Cn_n*X_n)+(Cn_b*X_b)+(c*x_fin))/(Cn_n + Cn_b + c);
-            
-            
-            
-        end
+            cop =  ((Cn_n*X_n)+(Cn_b*X_b)+(c*x_fin))/(Cn_n + Cn_b + c);       
+end
         
         function [C,Ceq] = NONLCON(X,vp,str_r,str_a)
             D_nos = str_r(10).r;
-
+            
             C = [];
             Ceq = [0];
             cop = CP_barrow(X,vp,str_r,str_a);
             
-            for i = 1:6001
+            %n = length(vp.altmachcg);
+            n = 6001;
+            for i = 1:n
                 margin = (cop-vp.altmachcg(i,2)/D_nos);
                 marg_resid = max([margin,2])-min([margin,2]);
-                Ceq(1) = Ceq(1) + marg_resid;
-            end
-            
+                if margin < 2
+                    Ceq(1) = Ceq(1) + 100*marg_resid;
+                elseif margin >= 2
+                    Ceq(1) = Ceq(1) + marg_resid;
+                end
+            end          
         end
         
   
