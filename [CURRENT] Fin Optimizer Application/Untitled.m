@@ -1,1 +1,2 @@
-save altmachcg.mat altmachcg
+x = [];
+append(x,1)

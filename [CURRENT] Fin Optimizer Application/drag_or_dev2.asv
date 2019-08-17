@@ -3,20 +3,19 @@ atm = load('atmostable.mat');
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Constant Declaration (all dimensions in meters):
-L_n = 0.548;    %1. Nose Length
-L_r = 5.844;    %2. Rocket Length
-L_z = 0.0762;   %3. Nozzle Length
-N = 3;          %4. # of fins
+L_n = 1.1;    %1. Nose Length
+L_r = 8.0;    %2. Rocket Length
+L_z = 0.30;   %3. Nozzle Length
+N = 4;          %4. # of fins
 Cn_n = 0.5;     %5. Nose Cone Coefficient
 t = 0.00635;    %6. Max Fin Root Thickness
 X_tc = 0.00635; %7. Distance from Fin Leading Edge to Max Thickness
-L_red = 0.05995;%8. Length Reduction @ back
-D_noz = 0.08204;%9. Nozzle Diameter
-D_nos = 0.140;  %10. Nose Base Diameter
-D_end = 0.1077; %11. End Diameter
-F_w = 0.00381;  %12. Fin Width (Thickness)
+L_red = 0.08;%8. Length Reduction @ back
+D_noz = 0.10;%9. Nozzle Diameter
+D_nos = 0.30;  %10. Nose Base Diameter
+D_end = 0.24; %11. End Diameter
+F_w = 0.006;  %12. Fin Width (Thickness)
 F_fl = 0.21895; %13. Fin Front Length
-Cg = 3.37235431;%14. Centre of Gravity
 
 
 rho = @(h) atm.atmosalt(round(h/100)+1,4);%1. Density
@@ -24,18 +23,18 @@ Ma = @(h) atm.atmosalt(round(h/100)+1,5); %2. Speed of Sound
 mu = @(h) atm.atmosalt(round(h/100)+1,6); %3. Dynamic Viscosity of Air (~1.8e-5)
 nu = @(h) (atm.atmosalt(round(h/100)+1,6))/(atm.atmosalt(round(h/100)+1,4)); % 4. Kinematic Viscosity (Dyn.Visc./Density)
 
-value_rocket = {L_n,L_r,L_z,N,Cn_n,t,X_tc,L_red,D_noz,D_nos,D_end,F_w,F_fl,Cg}; % <- TBD: MOVING CG WRT ALTITUDE/MACH
+value_rocket = {L_n,L_r,L_z,N,Cn_n,t,X_tc,L_red,D_noz,D_nos,D_end,F_w,F_fl}; % <- TBD: MOVING CG WRT ALTITUDE/MACH
 value_atmo = {rho,Ma,mu,nu};
 
 struct_rocket = struct("r",value_rocket);
 struct_atmo = struct("a",value_atmo);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-X0 = [0.1;0.1;0.1;0.1]; %Initial Conditions for [a,b,m,s]
+X0 = [0.15;0.15;0.15;0.15]; %Initial Conditions for [a,b,m,s]
 A = [-0.75,1,0,0;
-    %0,-0.9,1,0;
+    0,-0.9,1,0;
     -1,0,0,1];
-B = [0;0];
+B = [0;0;0];
 Aeq = [];
 Beq = [];
 LB = [0;0;-0.3;0];
@@ -58,6 +57,9 @@ y_bar = [0,X(4),X(4),0];
 plot(x_bar,y_bar);
 xlim([0,0.3]);
 ylim([0,0.3]);
+
+margin_vec = margin_confirm(X,vp,struct_rocket,struct_atmo);
+%disp(margin_vec)
 
 function F = drag(X,vp,str_r,str_a)        
    % n = length(vp.altmachcg);
@@ -99,7 +101,9 @@ Afe = (1/2)*(X(1)+X(2))*X(4);
 Afp = (1/2)*D_nos*X(1) + Afe; % Fin Planform Area (+ Body)
 mid =  X(4)/cos(atan((X(3)+(X(2)/2)-(X(1)/2))/X(4))); % Midchord
 tr = X(2)/X(1);
-MAC = X(1)*(2/3)*((1+tr+tr^2)/(1+tr));
+MAC = X(1)*(2/3)*((1+tr+tr^2)/(1+tr)); % Is actually the MGC approximated to be MAC
+
+
 %Abody = 
 Aref = N*(F_w*X(4));
 
@@ -283,24 +287,37 @@ function [cop] = CP_barrow(X,vp,str_r,str_a)
             cop =  ((Cn_n*X_n)+(Cn_b*X_b)+(c*x_fin))/(Cn_n + Cn_b + c);       
 end
         
-        function [C,Ceq] = NONLCON(X,vp,str_r,str_a)
+        function [c,ceq] = NONLCON(X,vp,str_r,str_a)
             D_nos = str_r(10).r;
             
-            C = [];
-            Ceq = [0];
+            c = [];
+            ceq = [];
             cop = CP_barrow(X,vp,str_r,str_a);
-            
             %n = length(vp.altmachcg);
             n = 6001;
             for i = 1:n
-                margin = (cop-vp.altmachcg(i,2)/D_nos);
-                marg_resid = max([margin,2])-min([margin,2]);
-                if margin < 2
-                    Ceq(1) = Ceq(1) + 100*marg_resid;
-                elseif margin >= 2
-                    Ceq(1) = Ceq(1) + marg_resid;
+                margin = ((cop*100)-vp.altmachcg(i,2)/D_nos);
+                c(1) = c(1) + (-margin+2) % Based on c(x) <= 0;
+                %marg_resid = max([margin,2])-min([margin,2]);
+                
                 end
+                
             end          
         end
-        
+
+        function [out] = margin_confirm(X,vp,str_r,str_a)
+            D_nos = str_r(10).r;
+            
+            
+            cop = CP_barrow(X,vp,str_r,str_a);
+            out = NaN(1,6001);
+            %n = length(vp.altmachcg);
+            n = 6001;
+            for i = 1:n
+                disp(cop*100);
+                disp(vp.altmachcg(i,2));
+                margin = (cop*100-vp.altmachcg(i,2)/D_nos);
+                out(i) = margin;     
+            end          
+        end
   
