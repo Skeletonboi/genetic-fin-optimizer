@@ -41,7 +41,7 @@ Beq = [];
 LB = [0;0;-0.3;0];
 UB = [0.3;0.3;0.3;0.3];
 %OPTIONS = optimoptions('fmincon','Algorithm','interior-point');
-X = fmincon(@(X) drag(X,vp,struct_rocket,struct_atmo),X0,A,B,Aeq,Beq,LB,UB,@(X) NONLCON(X,vp,struct_rocket,struct_atmo))
+X = fmincon(@(X) drag(X,vp,struct_rocket,struct_atmo),X0,A,B,Aeq,Beq,LB,UB,@(X) NONLCON(X))
 % FUN = Fin Drag Equation (Subsonic)
             
 % M = CP_FINAL(app,X);
@@ -279,8 +279,11 @@ function [cop] = CP_barrow(X,vp,str_r,str_a)
             int = 1+ (D_nos/2)/(X(4)+(D_nos/2));
             c =  int*(4*N*(X(4)/D_nos)^2)/(1+sqrt(1+(2*mid/(X(1)+X(2)))^2));
             x_fin =  l+ (X(3)*(X(1)+2*X(2)))/(3*(X(1)+X(2))) + (1/6)*(X(1)+X(2)-(X(1)*X(2))/(X(1)+X(2)));
-            cop =  ((Cn_n*X_n)+(Cn_b*X_b)+(c*x_fin))/(Cn_n + Cn_b + c);       
-end
+            cop =  ((Cn_n*X_n)+(Cn_b*X_b)+(c*x_fin))/(Cn_n + Cn_b + c);
+            
+            
+            
+        end
         
         function [C,Ceq] = NONLCON(X,vp,str_r,str_a)
             D_nos = str_r(10).r;
@@ -293,7 +296,8 @@ end
                 margin = (cop-vp.altmachcg(i,2)/D_nos);
                 marg_resid = max([margin,2])-min([margin,2]);
                 Ceq(1) = Ceq(1) + marg_resid;
-            end          
+            end
+            
         end
         
   
