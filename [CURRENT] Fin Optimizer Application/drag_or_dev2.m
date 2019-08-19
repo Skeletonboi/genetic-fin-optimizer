@@ -85,95 +85,95 @@ end
 
 
 function [Cd,Cd_incomp] = drag_OR(X,M,alt,str_r,str_a)
-% Interference Drag and Fin-Tip Vortices are ignored as they are considered
-% "relatively small"
-% Also assumed a fully turbulent boundary layer
+    % Interference Drag and Fin-Tip Vortices are ignored as they are considered
+    % "relatively small"
+    % Also assumed a fully turbulent boundary layer
 
-% RETREIVE CONSTANTS FROM STRUCTS
-D_nos = str_r(10).r;
-F_w = str_r(12).r;
-N = str_r(4).r;
-L_r = str_r(2).r;
-Ma = str_a(2).a(alt);
+    % RETREIVE CONSTANTS FROM STRUCTS
+    D_nos = str_r(10).r;
+    F_w = str_r(12).r;
+    N = str_r(4).r;
+    L_r = str_r(2).r;
+    Ma = str_a(2).a(alt);
 
-% Geometric Dimensions
-Afe = (1/2)*(X(1)+X(2))*X(4);
-Afp = (1/2)*D_nos*X(1) + Afe; % Fin Planform Area (+ Body)
-mid =  X(4)/cos(atan((X(3)+(X(2)/2)-(X(1)/2))/X(4))); % Midchord
-tr = X(2)/X(1);
-MAC = X(1)*(2/3)*((1+tr+tr^2)/(1+tr)); % Is actually the MGC approximated to be MAC
+    % Geometric Dimensions
+    Afe = (1/2)*(X(1)+X(2))*X(4);
+    Afp = (1/2)*D_nos*X(1) + Afe; % Fin Planform Area (+ Body)
+    mid =  X(4)/cos(atan((X(3)+(X(2)/2)-(X(1)/2))/X(4))); % Midchord
+    tr = X(2)/X(1);
+    MAC = X(1)*(2/3)*((1+tr+tr^2)/(1+tr)); % Is actually the MGC approximated to be MAC
 
 
-%Abody = 
-Aref = N*(F_w*X(4));
+    %Abody = 
+    Aref = N*(F_w*X(4));
 
-%REYNOLDS NUMBER CALCULATION
-V = M*Ma; %Instantaneous speed of rocket
-mu = str_a(3).a(alt);
-Rc = 51*((5*10^-6)/L_r)^-1.039;
+    %REYNOLDS NUMBER CALCULATION
+    V = M*Ma; %Instantaneous speed of rocket
+    mu = str_a(3).a(alt);
+    Rc = 51*((5*10^-6)/L_r)^-1.039;
 
-Re = (V*mid)/mu; % REYNOLDS NUMBER (MAC = characteristic length, no density)
+    Re = (V*mid)/mu; % REYNOLDS NUMBER (MAC = characteristic length, no density)
 
-%Skin Friction Coefficients for Varying Regimes of Flow
-if Re < 10^4
-    Cf = 1.48*(10^-2);
-elseif Re < Rc
-    Cf = 1/((1.5*log(Re)-5.6)^2);
-elseif Re > Rcm 
-    Cf = 0.032*((5*10^-6)/L_r)^0.2;
-end
-%Compressibility Corrections
-if V < Ma
-    Cfc = Cf*(1-0.1*M^2);
-elseif V > Ma
-    turb = Cf/((1+0.15*M^2)^0.58);
-    rough = Cf/(1+0.18*M^2);
-    if Re < Rc
-        Cfc = turb;
-    elseif Re > Rc
-        if rough < turb
+    %Skin Friction Coefficients for Varying Regimes of Flow
+    if Re < 10^4
+        Cf = 1.48*(10^-2);
+    elseif Re < Rc
+        Cf = 1/((1.5*log(Re)-5.6)^2);
+    elseif Re > Rcm 
+        Cf = 0.032*((5*10^-6)/L_r)^0.2;
+    end
+    %Compressibility Corrections
+    if V < Ma
+        Cfc = Cf*(1-0.1*M^2);
+    elseif V > Ma
+        turb = Cf/((1+0.15*M^2)^0.58);
+        rough = Cf/(1+0.18*M^2);
+        if Re < Rc
             Cfc = turb;
-        elseif rough > turb
-            Cfc = rough;
+        elseif Re > Rc
+            if rough < turb
+                Cfc = turb;
+            elseif rough > turb
+                Cfc = rough;
+            end
         end
     end
-end
 
-%Skin Friction Drag Coefficient
-Cdf = (Cfc*((1+(2*F_w)/MAC)*6*Afe))/Aref;
+    %Skin Friction Drag Coefficient
+    Cdf = (Cfc*((1+(2*F_w)/MAC)*6*Afe))/Aref;
 
-% Fin Pressure Drag Coefficient
-% firstly, the leading edge pressure drag (assuming rounded leading edge):
-if M < 0.9
-    Cd_le = ((1-M^2)^-0.417) - 1;
-elseif M < 1
-    Cd_le = 1- 1.785*(M-0.9);
-elseif M >= 1
-    Cd_le = 1.214 - (0.502/M^2) + (0.1095/M^4);
-end
-% now correcting it for sweep:
-Cd_le_sweep = Cd_le*(cos(atan(X(3)/X(4))^2));
-% Cd_te (or trailing edge) is 0 due to tapered geometry. The resulting Cdp
-% (fin pressure drag) is thus a scaled value of Cd_le_sweep.
+    % Fin Pressure Drag Coefficient
+    % firstly, the leading edge pressure drag (assuming rounded leading edge):
+    if M < 0.9
+        Cd_le = ((1-M^2)^-0.417) - 1;
+    elseif M < 1
+        Cd_le = 1- 1.785*(M-0.9);
+    elseif M >= 1
+        Cd_le = 1.214 - (0.502/M^2) + (0.1095/M^4);
+    end
+    % now correcting it for sweep:
+    Cd_le_sweep = Cd_le*(cos(atan(X(3)/X(4))^2));
+    % Cd_te (or trailing edge) is 0 due to tapered geometry. The resulting Cdp
+    % (fin pressure drag) is thus a scaled value of Cd_le_sweep.
 
-Cdp = (Cd_le_sweep*6*Afe)/Aref;
+    Cdp = (Cd_le_sweep*6*Afe)/Aref;
 
-Cd_incomp = Cdp+Cdf;
+    Cd_incomp = Cdp+Cdf;
 
-% Compressibility Correction (extending to compressible flow regime)
-% Prandtl-Glauert compressibility correction
-if M < 0.8
-    Cd = Cd_incomp/(sqrt(1-M^2));
-elseif M > 1.1
-    Cd = Cd_incomp/(sqrt(M^2-1));
-elseif 0.8 <= M <= 1.1
-    Cd = Cd_incomp/(sqrt(1-0.8^2)); %Ketchledge [1993] correction to avoid approaching infinity as M -> 1
-end
+    % Compressibility Correction (extending to compressible flow regime)
+    % Prandtl-Glauert compressibility correction
+    if M < 0.8
+        Cd = Cd_incomp/(sqrt(1-M^2));
+    elseif M > 1.1
+        Cd = Cd_incomp/(sqrt(M^2-1));
+    elseif 0.8 <= M <= 1.1
+        Cd = Cd_incomp/(sqrt(1-0.8^2)); %Ketchledge [1993] correction to avoid approaching infinity as M -> 1
+    end
 
 
-% NOTE: Transonic aerodynamic properties are accounted for "by using some
-% suitable interpolation function" [OR,pg.18] Not sure where to find this. OR
-% also does not take into account Hypersonic (Ma > 5)
+    % NOTE: Transonic aerodynamic properties are accounted for "by using some
+    % suitable interpolation function" [OR,pg.18] Not sure where to find this. OR
+    % also does not take into account Hypersonic (Ma > 5)
 
 end
 
@@ -259,63 +259,63 @@ end
 
 function [cop] = CP_barrow(X,vp,str_r,str_a)
 % CURRENTLY IMPLEMENTED AS BARROWMAN METHOD
-            L_n = str_r(1).r;
-            L_red = str_r(8).r;
-            D_nos = str_r(10).r;
-            D_end = str_r(11).r;
-            L_r = str_r(2).r;
-            N = str_r(4).r;
+	L_n = str_r(1).r;
+	L_red = str_r(8).r;
+	D_nos = str_r(10).r;
+	D_end = str_r(11).r;
+	L_r = str_r(2).r;
+	N = str_r(4).r;
             
-            % X (distance from nose tip to component's Cp):
-            % NOTE: Normal Body and Shoulder Forces are neglected
-            X_n = L_n/2;
-            X_b = L_r - L_red + (L_red/3)*(1+1/(1+D_nos/D_end));
+	% X (distance from nose tip to component's Cp):
+	% NOTE: Normal Body and Shoulder Forces are neglected
+	X_n = L_n/2;
+	X_b = L_r - L_red + (L_red/3)*(1+1/(1+D_nos/D_end));
             
-            % Component Coefficient of Normal Force (Cn)
-            Cn_n = 2;
-            Cn_b = 2*(((D_end/D_nos)^2)-1);
+	% Component Coefficient of Normal Force (Cn)
+	Cn_n = 2;
+	Cn_b = 2*(((D_end/D_nos)^2)-1);
             
-            %Optimization Variables = X(1) = a, X(2) = b, X(3) = m, X(4) = s
+	%Optimization Variables = X(1) = a, X(2) = b, X(3) = m, X(4) = s
             
-            % Using default values for all other variables,
-            % % we can cast final Cp position as cp(a,b,m,s):
-            mid =  X(4)/cos(atan((X(3)+(X(2)/2)-(X(1)/2))/X(4)));
-            l =  (L_r-X(1))-L_red;
-            int = 1+ (D_nos/2)/(X(4)+(D_nos/2));
-            c =  int*(4*N*(X(4)/D_nos)^2)/(1+sqrt(1+(2*mid/(X(1)+X(2)))^2));
-            x_fin =  l+ (X(3)*(X(1)+2*X(2)))/(3*(X(1)+X(2))) + (1/6)*(X(1)+X(2)-(X(1)*X(2))/(X(1)+X(2)));
-            cop =  ((Cn_n*X_n)+(Cn_b*X_b)+(c*x_fin))/(Cn_n + Cn_b + c);       
+	% Using default values for all other variables,
+	% % we can cast final Cp position as cp(a,b,m,s):
+	mid =  X(4)/cos(atan((X(3)+(X(2)/2)-(X(1)/2))/X(4)));
+	l =  (L_r-X(1))-L_red;
+	int = 1+ (D_nos/2)/(X(4)+(D_nos/2));
+	c =  int*(4*N*(X(4)/D_nos)^2)/(1+sqrt(1+(2*mid/(X(1)+X(2)))^2));
+	x_fin =  l+ (X(3)*(X(1)+2*X(2)))/(3*(X(1)+X(2))) + (1/6)*(X(1)+X(2)-(X(1)*X(2))/(X(1)+X(2)));
+	cop =  ((Cn_n*X_n)+(Cn_b*X_b)+(c*x_fin))/(Cn_n + Cn_b + c);       
 end
         
-        function [c,ceq] = NONLCON(X,vp,str_r,str_a)
-            D_nos = str_r(10).r;
+function [c,ceq] = NONLCON(X,vp,str_r,str_a)
+	D_nos = str_r(10).r;
             
-            c = [0,0];
-            ceq = [];
-            cop = CP_barrow(X,vp,str_r,str_a);
-            %n = length(vp.altmachcg);
-            n = 6001;
-            for i = 1:n
-                margin = ((cop*100)-vp.altmachcg(i,2)/D_nos);
-                c(1) = c(1) + (-margin+2); % Based on c(x) <= 0;
-                c(2) = c(2) + (margin-3);
-                %marg_resid = max([margin,2])-min([margin,2]);
-            end          
-        end
+	c = [0,0];
+	ceq = [];
+	cop = CP_barrow(X,vp,str_r,str_a);
+	%n = length(vp.altmachcg);
+	n = 6001;
+    for i = 1:n
+    	margin = ((cop*100)-vp.altmachcg(i,2)/D_nos);
+        c(1) = c(1) + (-margin+2); % Based on c(x) <= 0;
+        c(2) = c(2) + (margin-3);
+        %marg_resid = max([margin,2])-min([margin,2]);
+    end          
+end
 
-        function [out] = margin_confirm(X,vp,str_r,str_a)
-            D_nos = str_r(10).r;
+function [out] = margin_confirm(X,vp,str_r,str_a)
+	D_nos = str_r(10).r;
             
             
-            cop = CP_barrow(X,vp,str_r,str_a);
-            out = NaN(1,6001);
-            %n = length(vp.altmachcg);
-            n = 6001;
-            for i = 1:n
-                disp(cop*100);
-                disp(vp.altmachcg(i,2));
-                margin = (cop*100-vp.altmachcg(i,2)/D_nos);
-                out(i) = margin;     
-            end          
-        end
+	cop = CP_barrow(X,vp,str_r,str_a);
+	out = NaN(1,6001);
+	%n = length(vp.altmachcg);
+	n = 6001;
+    for i = 1:n
+        disp(cop*100);
+    	disp(vp.altmachcg(i,2));
+    	margin = (cop*100-vp.altmachcg(i,2)/D_nos);
+    	out(i) = margin;
+    end          
+end
   
