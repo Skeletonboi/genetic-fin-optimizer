@@ -23,7 +23,7 @@ Ma = @(h) atm.atmosalt(round(h/100)+1,5); %2. Speed of Sound
 mu = @(h) atm.atmosalt(round(h/100)+1,6); %3. Dynamic Viscosity of Air (~1.8e-5)
 nu = @(h) (atm.atmosalt(round(h/100)+1,6))/(atm.atmosalt(round(h/100)+1,4)); % 4. Kinematic Viscosity (Dyn.Visc./Density)
 
-value_rocket = {L_n,L_r,L_z,N,Cn_n,t,X_tc,L_red,D_noz,D_nos,D_end,F_w,F_fl}; % <- TBD: MOVING CG WRT ALTITUDE/MACH
+value_rocket = {L_n,L_r,L_z,N,Cn_n,t,X_tc,L_red,D_noz,D_nos,D_end,F_w,F_fl}; 
 value_atmo = {rho,Ma,mu,nu};
 
 struct_rocket = struct("r",value_rocket);
@@ -44,7 +44,7 @@ X = fmincon(@(X) drag(X,vp,struct_rocket,struct_atmo),X0,A,B,Aeq,Beq,LB,UB,@(X) 
 % FUN = Fin Drag Equation (Subsonic)
             
 % M = CP_FINAL(app,X);
-FinDragCoefficient = drag(X,vp,struct_rocket,struct_atmo);
+FinDragCoefficient = drag(X,vp,struct_rocket,struct_atmo)
             
 RootChord = X(1);
 TipChord = X(2);
