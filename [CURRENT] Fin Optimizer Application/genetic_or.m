@@ -31,23 +31,46 @@ ub = 0.75;
 lb = 0;
 init_set = (ub-lb).*rand(num_pop,5)+lb; % 4 independent variables
 init_score = NaN(1,num_pop);
+max1 = {0,0,[]};
+max2 = {0,0,[]};
+k_max = struct("km1",max1,"km2",max2);
 % Evaluating fitness scores for initialization set
-k_max = zeros(2,4);
 for i = 1:num_pop
-    init_score(i) = fitness([init_set(i,1),init_set(i,2),init_set(i,3),init_set(i,4)],vp,struct_rocket,struct_atmo);
-    
-    for j = length(k_max):1
-        if init_score(i) < k_max(1,j)
-            break
-        end        
+    X = [init_set(i,1),init_set(i,2),init_set(i,3),init_set(i,4)];
+    init_score(i) = fitness(X,vp,struct_rocket,struct_atmo);
+    % Keeping two highest scoring sets
+    if init_score(i) > k_max(2).km2
+        if init_score(i) < k_max(2).km1
+            k_max(2).km2 = init_score(i);
+            k_max(1).km2 = i;
+            k_max(3).km2 = X;
+        else
+            temp2 = k_max(2).km1;
+            temp1 = k_max(1).km1;
+            temp3 = k_max(3).km1;
+            k_max(2).km2 = temp2;
+            k_max(1).km2 = temp1;
+            k_max(3).km2 = temp3;
+            k_max(2).km1 = init_score(i);
+            k_max(1).km1 = i;
+            k_max(3).km1 = X;
+        end
     end
-    k_max(1,j) = init_score(i);
-    k_max(2,j) = i;
-    
-end
+end   
+% Crossover the two best performing fin-dimension sets
+parent_X = [mean([k_max(3).km1;k_max(3).km2])];
+% Randomized mutation of parent dimensions (invoking exploration of domain
+% space versus pure exploitation of good guesses.
+%
+% This step will require some fiddling (of hyperparameters such as method
+% of mutation) to acquire proper balance of exploitation-to-exploration.
+%
+% POSSIBLE IMPROVEMENT AVENUES: Mutation("learning") momentumt (ie. in SGD
+% ), variable mutation rate, etc; These methods can help move the
+% convergence point out of local minima by initially overshooting with
+% large learning/mutation rates. 
 
-% Selection (Fitness-based)
-k = maxk(init_score,6);
+
 
 
 
