@@ -29,7 +29,7 @@ value_atmo = {rho,Ma,mu,nu};
 struct_rocket = struct("r",value_rocket);
 struct_atmo = struct("a",value_atmo);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
+% 
 X0 = [0.15;0.15;0.15;0.15]; %Initial Conditions for [a,b,m,s]
 A = [-0.75,1,0,0;
     0,-0.9,1,0;
@@ -41,11 +41,31 @@ LB = [0;0;-0.3;0];
 UB = [0.3;0.3;0.3;0.3];
 %OPTIONS = optimoptions('fmincon','Algorithm','interior-point');
 X = fmincon(@(X) drag(X,vp,struct_rocket,struct_atmo),X0,A,B,Aeq,Beq,LB,UB,@(X) NONLCON(X,vp,struct_rocket,struct_atmo))
-% FUN = Fin Drag Equation (Subsonic)
+% % FUN = Fin Drag Equation (Subsonic)
             
 % M = CP_FINAL(app,X);
-FinDragCoefficient = drag(X,vp,struct_rocket,struct_atmo)
-            
+% for j = 1:4
+%     FinDragCoefficient = drag([X(1)-j*0.02,X(2)-j*0.02,X(3)+j*0.02,X(4)-j*0.02],vp,struct_rocket,struct_atmo)
+%     margin_vec = margin_confirm([X(1)-j*0.02,X(2)-j*0.02,X(3)+j*0.02,X(4)-j*0.02],vp,struct_rocket,struct_atmo);
+%     mean(margin_vec)
+%     min(margin_vec)
+%     hold on
+%     a = X(1)-j*0.02;
+%     b = X(2)-j*0.02;
+%     m = X(3)+j*0.02;
+%     s = X(4)-j*0.02;
+% 
+%     x_bar = [0,m,m+b,a];
+%     y_bar = [0,s,s,0];
+%             
+%     plot(x_bar,y_bar);
+%     xlim([0,0.3]);
+%     ylim([0,0.3]);
+%     hold off
+% end    
+
+
+    
 RootChord = X(1);
 TipChord = X(2);
 SweepDistance = X(3);
@@ -296,7 +316,7 @@ function [c,ceq] = NONLCON(X,vp,str_r,str_a)
 	%n = length(vp.altmachcg);
 	n = 6001;
     for i = 1:n
-    	margin = ((cop*100)-vp.altmachcg(i,2)/D_nos);
+    	margin = (cop*100-vp.altmachcg(i,2))/(D_nos*100);
         c(1) = c(1) + (-margin+2); % Based on c(x) <= 0;
         c(2) = c(2) + (margin-3);
         %marg_resid = max([margin,2])-min([margin,2]);
@@ -312,9 +332,8 @@ function [out] = margin_confirm(X,vp,str_r,str_a)
 	%n = length(vp.altmachcg);
 	n = 6001;
     for i = 1:n
-        disp(cop*100);
-    	disp(vp.altmachcg(i,2));
-    	margin = (cop*100-vp.altmachcg(i,2)/D_nos);
+
+    	margin = (cop*100-vp.altmachcg(i,2))/(D_nos*100);
     	out(i) = margin;
     end          
 end
