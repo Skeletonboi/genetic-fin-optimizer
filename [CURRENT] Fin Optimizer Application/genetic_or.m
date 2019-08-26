@@ -61,7 +61,8 @@ struct_atmo = struct("a",value_atmo);
 num_pop = 100;
 ub = 0.75;
 lb = 0;
-init_set = (ub-lb).*rand(num_pop,5)+lb; % Initialize population of 4 independent variables
+d = ub-lb;
+init_set = d.*rand(num_pop,4)+lb; % Initialize population of 4 independent variables
 init_score = NaN(1,num_pop);
 max1 = {0,0,[]};
 max2 = {0,0,[]};
@@ -105,13 +106,12 @@ ind1 = p_select(init_score);
 ind2 = p_select(init_score);
 mom = [init_set(ind1,1),init_set(ind1,2),init_set(ind1,3),init_set(ind1,4)];
 dad = [init_set(ind2,1),init_set(ind2,2),init_set(ind2,3),init_set(ind2,4)];
-parent_X = [mean([mom;dad])];
+par = [mean([mom;dad])];
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Create randomized mutation population of parent dimensions (invoking 
-% exploration of domain space versus pure exploitation of good guesses
-% (based on historic evolutions)
+% exploration of domain space versus pure exploitation of good guesses)
 %
 % This step will require some fiddling (of hyperparameters such as method
 % of mutation) to acquire proper balance of exploitation-to-exploration.
@@ -121,10 +121,74 @@ parent_X = [mean([mom;dad])];
 % convergence point out of local minima by initially overshooting them with
 % large learning/mutation rates to hopefully reach the global minimum.
 %
-% Chosen mutation algorithm chooses two random independent variables (out
-% of the 4) and randomizes them based on 
-new_pop = ;
+% The chosen mutation algorithm chooses two random independent variables 
+%(out of the 4) to mutate. The mutation is accomplished by adding or
+% subtracting the existing value by a random variable whose value is 
+% bounded by the existing parent value and the upper/lower bound. The 
+% probability distribution of the random variable is an exponential
+% distribution; this distribution (hyperparameter) was chosen to be 
+% exponential as it results in a greater probability of the mutation to 
+% result with a value near the existing parent value. 
+%
+% Again, this is decision is a hyperparameter, and can be tuned.
 
+% 0. Initialize space for mutation population
+mut_pop = NaN(num_pop,4);
+mut_score = NaN(1,num_pop);
+
+% 0.5. Compute difference between existing parent values and UB/LB
+dau = ub-par(1);
+dal = par(1)-lb;
+dbu = ub-par(2);
+dbl = par(2)-lb;
+dmu = ub-par(3);
+dml = par(3)-lb;
+dsu = ub-par(4);
+dsl = par(4)-lb;
+dmat = [dau,dbu,dmu,dsu;dal,dbl,dml,dsl;];
+
+% 0.75. Compute the mean value of probability distribution for each diff.
+mmat = -dmat./(log(0.0001));
+
+for p = 1:num_pop
+    % 1. Choose whether mutation is additive or subtractive (50/50 split)
+    if rand > 0.5
+        dir = 1;
+        sign = 1;
+    else
+        dir = 2;
+        sign = -1;
+    end
+
+    % 2. Choose which two of the design variables to mutate
+    d_dist = [0.25,0.25,0.25,0.25];
+    i = p_select(d_dist);
+    j = p_select(d_dist);
+
+    % 3. Generate random variable according to exponential distribution
+
+    Ri = exprnd(mmat(dir,i));
+    Rj = exprnd(mmat(dir,j));
+
+    % 4. Perform addition/subtraction to mutate
+    par_temp = par;
+    par_temp(i) = par(i) + sign*Ri;
+    par_temp(j) = par(j) + sign*Rj;
+    % 5. Add new mutation to mutation population
+    for q = 1:4
+        mut_pop(p,q) = par_temp(q);
+    end
+    
+    % 6. Simultaneously compute the fitness score of the new mutation
+    mut_score(p) = fitness(par_temp,vp,struct_rocket,struct_atmo);
+end
+
+% Post-mutation selection
+m_ind1 = p_select(init_score);
+m_ind2 = p_select(init_score);
+m_mom = [init_set(m_ind1,1),init_set(m_ind1,2),init_set(m_ind1,3),init_set(m_ind1,4)];
+m_dad = [init_set(m_ind2,1),init_set(m_ind2,2),init_set(m_ind2,3),init_set(m_ind2,4)];
+m_par = [mean([mom;dad])];
 
 
 
@@ -156,12 +220,13 @@ new_pop = ;
 % {    (-1/(1+exp(-0.8x+5)))+1+(1/(1+exp(-1.6+5))); 2<x;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% [INPUT] Set scoring function parameter by the 10th percentile;
-% ie. What drag should a score of 10% (out of 100%) be given to?
-tenth = 50000; % This hyperparameter is completely arbitrary for now
-expnt = (log(0.1))/tenth;
-% Calculate fitness score of fin-set dimensions
 function [score] = fitness(X,vp,str_r,str_a)
+    % [INPUT] Set scoring function parameter by the 10th percentile;
+    % ie. What drag should a score of 10% (out of 100%) be given to?
+    tenth = 50000; % This hyperparameter is completely arbitrary for now
+    expnt = (log(0.1))/tenth;
+    
+    % Calculate fitness score of fin-set dimensions
     D_nos = str_r(10).r;
     n = 6001;
     
