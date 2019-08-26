@@ -25,69 +25,6 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Initial Population Initialization
-num_pop = 100;
-ub = 0.75;
-lb = 0;
-init_set = (ub-lb).*rand(num_pop,5)+lb; % 4 independent variables
-init_score = NaN(1,num_pop);
-max1 = {0,0,[]};
-max2 = {0,0,[]};
-k_max = struct("km1",max1,"km2",max2);
-% Evaluating fitness scores for initialization set
-for i = 1:num_pop
-    X = [init_set(i,1),init_set(i,2),init_set(i,3),init_set(i,4)];
-    init_score(i) = fitness(X,vp,struct_rocket,struct_atmo);
-    % Keeping two highest scoring sets
-    if init_score(i) > k_max(2).km2
-        if init_score(i) < k_max(2).km1
-            k_max(2).km2 = init_score(i);
-            k_max(1).km2 = i;
-            k_max(3).km2 = X;
-        else
-            temp2 = k_max(2).km1;
-            temp1 = k_max(1).km1;
-            temp3 = k_max(3).km1;
-            k_max(2).km2 = temp2;
-            k_max(1).km2 = temp1;
-            k_max(3).km2 = temp3;
-            k_max(2).km1 = init_score(i);
-            k_max(1).km1 = i;
-            k_max(3).km1 = X;
-        end
-    end
-end   
-% Crossover the two best performing fin-dimension sets
-parent_X = [mean([k_max(3).km1;k_max(3).km2])];
-% Randomized mutation of parent dimensions (invoking exploration of domain
-% space versus pure exploitation of good guesses.
-%
-% This step will require some fiddling (of hyperparameters such as method
-% of mutation) to acquire proper balance of exploitation-to-exploration.
-%
-% POSSIBLE IMPROVEMENT AVENUES: Mutation("learning") momentumt (ie. in SGD
-% ), variable mutation rate, etc; These methods can help move the
-% convergence point out of local minima by initially overshooting with
-% large learning/mutation rates. 
-
-
-
-
-
-
-% Compute Fitness
-% LOOP
-% selection
-% crossover
-% mutation
-% compute fitness
-% UNTIL POP HAS CONVERGED
-% STOP
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Rocket/Atmospheric Constants Initialization
 vp = load('altmachcg.mat') ;
 atm = load('atmostable.mat');
@@ -120,6 +57,91 @@ struct_atmo = struct("a",value_atmo);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Initial Population Initialization
+num_pop = 100;
+ub = 0.75;
+lb = 0;
+init_set = (ub-lb).*rand(num_pop,5)+lb; % Initialize population of 4 independent variables
+init_score = NaN(1,num_pop);
+max1 = {0,0,[]};
+max2 = {0,0,[]};
+k_max = struct("km1",max1,"km2",max2);
+% Evaluating fitness scores for initialization set
+for i = 1:num_pop
+    X = [init_set(i,1),init_set(i,2),init_set(i,3),init_set(i,4)];
+    init_score(i) = fitness(X,vp,struct_rocket,struct_atmo);
+    % Keeping two highest scoring sets
+    if init_score(i) > k_max(2).km2
+        if init_score(i) < k_max(2).km1
+            k_max(2).km2 = init_score(i);
+            k_max(1).km2 = i;
+            k_max(3).km2 = X;
+        else
+            temp2 = k_max(2).km1;
+            temp1 = k_max(1).km1;
+            temp3 = k_max(3).km1;
+            k_max(2).km2 = temp2;
+            k_max(1).km2 = temp1;
+            k_max(3).km2 = temp3;
+            k_max(2).km1 = init_score(i);
+            k_max(1).km1 = i;
+            k_max(3).km1 = X;
+        end
+    end
+end   
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% [INPUT] Selection process
+% Choose a method of selection:
+% (1) Best mean-of-two
+%parent_X = [mean([k_max(3).km1;k_max(3).km2])];
+% (2) Probabilistic best (selection prob. directly proportional set fitness
+% score)
+%ind = p_select(init_score);
+%parent_X = [init_set(ind,1),init_set(ind,2),init_set(ind,3),init_set(ind,4)];
+
+% (3) Probabilistic best mean-of-two (selection prob. directly proportional
+% to set fitness score)
+ind1 = p_select(init_score);
+ind2 = p_select(init_score);
+mom = [init_set(ind1,1),init_set(ind1,2),init_set(ind1,3),init_set(ind1,4)];
+dad = [init_set(ind2,1),init_set(ind2,2),init_set(ind2,3),init_set(ind2,4)];
+parent_X = [mean([mom;dad])];
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Create randomized mutation population of parent dimensions (invoking 
+% exploration of domain space versus pure exploitation of good guesses
+% (based on historic evolutions)
+%
+% This step will require some fiddling (of hyperparameters such as method
+% of mutation) to acquire proper balance of exploitation-to-exploration.
+%
+% POSSIBLE IMPROVEMENT AVENUES: Mutation("learning") momentum (ie. in SGD
+% ), variable mutation rate, etc; These methods can help move the
+% convergence point out of local minima by initially overshooting them with
+% large learning/mutation rates to hopefully reach the global minimum.
+%
+% Chosen mutation algorithm chooses two random independent variables (out
+% of the 4) and randomizes them based on 
+new_pop = ;
+
+
+
+
+
+% Compute Fitness
+% LOOP
+% selection
+% crossover
+% mutation
+% compute fitness
+% UNTIL POPULATION HAS CONVERGED
+% STOP
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % FITNESS FUNCTION 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % The goal of the fitness function is to reward fin dimension combinations
@@ -133,14 +155,17 @@ struct_atmo = struct("a",value_atmo);
 % {    exp(50x-100); 0<x<=2;
 % {    (-1/(1+exp(-0.8x+5)))+1+(1/(1+exp(-1.6+5))); 2<x;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% DRAG FITNESS FUNC(will need to tune for optimal fitness function):
-% {    exp(0.0001x); 0<x<50'000;
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% [INPUT] Set scoring function parameter by the 10th percentile;
+% ie. What drag should a score of 10% (out of 100%) be given to?
+tenth = 50000; % This hyperparameter is completely arbitrary for now
+expnt = (log(0.1))/tenth;
+% Calculate fitness score of fin-set dimensions
 function [score] = fitness(X,vp,str_r,str_a)
     D_nos = str_r(10).r;
     n = 6001;
-    f_drag = exp(-0.00001*drag(X,vp,str_r,str_a));
+    
+    f_drag = exp(expnt*drag(X,vp,str_r,str_a));
     cop = CP_barrow(X,vp,str_r,str_a);
     for i = 1:n
         margin = (cop*100-vp.altmachcg(i,2))/(D_nos*100);
@@ -296,3 +321,12 @@ function [cop] = CP_barrow(X,vp,str_r,str_a)
 end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Probabilistic selection from given discrete p-dist:
+function F = p_select(P)
+    x = cumsum([0 P(:).'/sum(P(:))]);
+    x(end) = 1e3*eps + x(end);
+    [a a] = histc(rand,x);
+    F = a;
+end
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
