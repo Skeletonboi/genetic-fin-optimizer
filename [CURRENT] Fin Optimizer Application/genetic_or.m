@@ -23,9 +23,8 @@
 % stability caliber constraint, and optionally, 3) a manually-imposed 
 % inter-fin-dimensional constraint.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Rocket/Atmospheric Constants Initialization
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 vp = load('altmachcg.mat') ;
 atm = load('atmostable.mat');
 
@@ -43,7 +42,6 @@ D_end = 0.24; %11. End Diameter
 F_w = 0.006;  %12. Fin Width (Thickness)
 F_fl = 0.21895; %13. Fin Front Length
 
-
 rho = @(h) atm.atmosalt(round(h/100)+1,4);%1. Density
 Ma = @(h) atm.atmosalt(round(h/100)+1,5); %2. Speed of Sound
 mu = @(h) atm.atmosalt(round(h/100)+1,6); %3. Dynamic Viscosity of Air (~1.8e-5)
@@ -55,11 +53,10 @@ value_atmo = {rho,Ma,mu,nu};
 struct_rocket = struct("r",value_rocket);
 struct_atmo = struct("a",value_atmo);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Initial Population Initialization
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 num_pop = 100;
-ub = 0.75;
+ub = 0.3;
 lb = 0;
 d = ub-lb;
 init_set = d.*rand(num_pop,4)+lb; % Initialize population of 4 independent variables
@@ -67,6 +64,7 @@ init_score = NaN(1,num_pop);
 max1 = {0,0,[]};
 max2 = {0,0,[]};
 k_max = struct("km1",max1,"km2",max2);
+
 % Evaluating fitness scores for initialization set
 for i = 1:num_pop
     X = [init_set(i,1),init_set(i,2),init_set(i,3),init_set(i,4)];
@@ -92,6 +90,7 @@ for i = 1:num_pop
 end   
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % [INPUT] Selection process
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Choose a method of selection:
 % (1) Best mean-of-two
 %parent_X = [mean([k_max(3).km1;k_max(3).km2])];
@@ -99,7 +98,6 @@ end
 % score)
 %ind = p_select(init_score);
 %parent_X = [init_set(ind,1),init_set(ind,2),init_set(ind,3),init_set(ind,4)];
-
 % (3) Probabilistic best mean-of-two (selection prob. directly proportional
 % to set fitness score)
 ind1 = p_select(init_score);
@@ -108,7 +106,15 @@ mom = [init_set(ind1,1),init_set(ind1,2),init_set(ind1,3),init_set(ind1,4)];
 dad = [init_set(ind2,1),init_set(ind2,2),init_set(ind2,3),init_set(ind2,4)];
 par = [mean([mom;dad])];
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% [INPUT] Evolution Process
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Choose number of evolutions to perform
+num_evo = 100;
 
+% Looping over # of evolutions
+for e = 1:num_evo
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Mutation Process
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Create randomized mutation population of parent dimensions (invoking 
 % exploration of domain space versus pure exploitation of good guesses)
@@ -129,14 +135,13 @@ par = [mean([mom;dad])];
 % distribution; this distribution (hyperparameter) was chosen to be 
 % exponential as it results in a greater probability of the mutation to 
 % result with a value near the existing parent value. 
-%
 % Again, this is decision is a hyperparameter, and can be tuned.
 
-% 0. Initialize space for mutation population
+% i) Initialize space for mutation population
 mut_pop = NaN(num_pop,4);
 mut_score = NaN(1,num_pop);
 
-% 0.5. Compute difference between existing parent values and UB/LB
+% ii) Compute difference between existing parent values and UB/LB
 dau = ub-par(1);
 dal = par(1)-lb;
 dbu = ub-par(2);
@@ -147,7 +152,7 @@ dsu = ub-par(4);
 dsl = par(4)-lb;
 dmat = [dau,dbu,dmu,dsu;dal,dbl,dml,dsl;];
 
-% 0.75. Compute the mean value of probability distribution for each diff.
+% iii) Compute the mean value of probability distribution for each diff.
 mmat = -dmat./(log(0.0001));
 
 for p = 1:num_pop
@@ -166,7 +171,6 @@ for p = 1:num_pop
     j = p_select(d_dist);
 
     % 3. Generate random variable according to exponential distribution
-
     Ri = exprnd(mmat(dir,i));
     Rj = exprnd(mmat(dir,j));
 
@@ -174,25 +178,32 @@ for p = 1:num_pop
     par_temp = par;
     par_temp(i) = par(i) + sign*Ri;
     par_temp(j) = par(j) + sign*Rj;
+
     % 5. Add new mutation to mutation population
     for q = 1:4
         mut_pop(p,q) = par_temp(q);
     end
     
-    % 6. Simultaneously compute the fitness score of the new mutation
+    % 6. Compute the fitness score of the new mutation
     mut_score(p) = fitness(par_temp,vp,struct_rocket,struct_atmo);
 end
 
-% Post-mutation selection
-m_ind1 = p_select(init_score);
-m_ind2 = p_select(init_score);
-m_mom = [init_set(m_ind1,1),init_set(m_ind1,2),init_set(m_ind1,3),init_set(m_ind1,4)];
-m_dad = [init_set(m_ind2,1),init_set(m_ind2,2),init_set(m_ind2,3),init_set(m_ind2,4)];
-m_par = [mean([mom;dad])];
+% iv) Post-mutation population selection
+m_ind1 = p_select(mut_score);
+m_ind2 = p_select(mut_score);
+m_mom = [mut_pop(m_ind1,1),mut_pop(m_ind1,2),mut_pop(m_ind1,3),mut_pop(m_ind1,4)];
+m_dad = [mut_pop(m_ind2,1),mut_pop(m_ind2,2),mut_pop(m_ind2,3),mut_pop(m_ind2,4)];
+% Update parent dimensions
+par = [mean([m_mom;m_dad])];
+end
 
-
-
-
+hold on
+x_bar = [0,par(3),par(3)+par(2),par(1)];
+y_bar = [0,par(4),par(4),0];
+xlim([0,0.8]);
+ylim([0,0.8]);            
+plot(x_bar,y_bar);
+legend('a');
 % Compute Fitness
 % LOOP
 % selection
@@ -264,8 +275,8 @@ end
 
 end
 function [Cd,Cd_incomp] = drag_OR(X,M,alt,str_r,str_a)
-    % Interference Drag and Fin-Tip Vortices are ignored as they are considered
-    % "relatively small"
+    % Interference Drag and Fin-Tip Vortices are ignored as they are 
+    % considered "relatively small"
     % Also assumed a fully turbulent boundary layer
 
     % RETREIVE CONSTANTS FROM STRUCTS
