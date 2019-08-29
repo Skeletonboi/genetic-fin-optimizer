@@ -52,6 +52,9 @@ value_atmo = {rho,Ma,mu,nu};
 
 struct_rocket = struct("r",value_rocket);
 struct_atmo = struct("a",value_atmo);
+
+net_par = NaN(50,4);
+for n = 1:1
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Initial Population Initialization
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -100,8 +103,9 @@ end
 %parent_X = [init_set(ind,1),init_set(ind,2),init_set(ind,3),init_set(ind,4)];
 % (3) Probabilistic best mean-of-two (selection prob. directly proportional
 % to set fitness score)
-ind1 = p_select(init_score);
-ind2 = p_select(init_score);
+
+ind1 = p_select(init_score.^3);
+ind2 = p_select(init_score.^3);
 mom = [init_set(ind1,1),init_set(ind1,2),init_set(ind1,3),init_set(ind1,4)];
 dad = [init_set(ind2,1),init_set(ind2,2),init_set(ind2,3),init_set(ind2,4)];
 par = [mean([mom;dad])];
@@ -111,8 +115,14 @@ par = [mean([mom;dad])];
 % Choose number of evolutions to perform
 num_evo = 100;
 
+next = true;
+p_par = zeros(1,4);
+cei = 0;
 % Looping over # of evolutions
-for e = 1:num_evo
+%for e = 1:num_evo
+while next
+    cei = cei + 1;
+    fprintf('Current Evolution: %d \n',cei);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Mutation Process
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -138,8 +148,10 @@ for e = 1:num_evo
 % Again, this is decision is a hyperparameter, and can be tuned.
 
 % i) Initialize space for mutation population
-mut_pop = NaN(num_pop,4);
-mut_score = NaN(1,num_pop);
+mut_pop = zeros(num_pop,4);
+mut_score = zeros(num_pop,1);
+% mut_pop = gpuArray(mut_pop_cpu);
+% mut_score = gpuArray(mut_score_cpu);
 
 % ii) Compute difference between existing parent values and UB/LB
 dau = ub-par(1);
@@ -155,7 +167,7 @@ dmat = [dau,dbu,dmu,dsu;dal,dbl,dml,dsl;];
 % iii) Compute the mean value of probability distribution for each diff.
 mmat = -dmat./(log(0.0001));
 
-for p = 1:num_pop
+parfor p = 1:num_pop
     % 1. Choose whether mutation is additive or subtractive (50/50 split)
     if rand > 0.5
         dir = 1;
@@ -186,24 +198,49 @@ for p = 1:num_pop
     
     % 6. Compute the fitness score of the new mutation
     mut_score(p) = fitness(par_temp,vp,struct_rocket,struct_atmo);
+    
 end
 
-% iv) Post-mutation population selection
-m_ind1 = p_select(mut_score);
-m_ind2 = p_select(mut_score);
+% iv) SELECTION (Post-mutation population) 
+disp(mut_score);
+m_ind1 = p_select((mut_score).^3);
+m_ind2 = p_select((mut_score).^3);
 m_mom = [mut_pop(m_ind1,1),mut_pop(m_ind1,2),mut_pop(m_ind1,3),mut_pop(m_ind1,4)];
 m_dad = [mut_pop(m_ind2,1),mut_pop(m_ind2,2),mut_pop(m_ind2,3),mut_pop(m_ind2,4)];
 % Update parent dimensions
+p_par = par;
 par = [mean([m_mom;m_dad])];
+fprintf('Evolution Fitness: %d \n',fitness(par,vp,struct_rocket,struct_atmo));
+
+% Check for convergence
+next = true;
+dims_converged = 0;
+for i = 1:4
+    if abs(p_par(i)-par(i)) < 0.01
+        dims_converged = dims_converged + 1;
+    end
+    if dims_converged > 4
+        next = false;
+        fprintf('Converged, stopping evolution');
+    end
+end
+
 end
 
 hold on
 x_bar = [0,par(3),par(3)+par(2),par(1)];
 y_bar = [0,par(4),par(4),0];
 xlim([0,0.8]);
-ylim([0,0.8]);            
+ylim([0,0.8]);
 plot(x_bar,y_bar);
 legend('a');
+
+net_par(n,1) = par(1);
+net_par(n,2) = par(2);
+net_par(n,3) = par(3);
+net_par(n,4) = par(4);
+
+end
 % Compute Fitness
 % LOOP
 % selection
@@ -212,6 +249,7 @@ legend('a');
 % compute fitness
 % UNTIL POPULATION HAS CONVERGED
 % STOP
+
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
