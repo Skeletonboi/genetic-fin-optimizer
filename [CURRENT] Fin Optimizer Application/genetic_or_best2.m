@@ -77,7 +77,7 @@ for i = 1:num_pop
     init_score(i) = fitness(X,vp,struct_rocket,struct_atmo);
     % Keeping two highest scoring sets
     if init_score(i) > km2_s
-        if init_score(i) < km1_s
+        if init_score(i) <= km1_s
             km2_s = init_score(i);
             km2_i = i;
             km2_dim = X;
@@ -89,7 +89,7 @@ for i = 1:num_pop
             km2_s = temps;
             km2_dim = tempdim;
             km1_s = init_score(i);
-            km1_i.km1 = i;
+            km1_i = i;
             km1_dim = X;
         end
     end
@@ -107,10 +107,12 @@ end
 % (3) Probabilistic best mean-of-two (selection prob. directly proportional
 % to set fitness score)
 
-ind1 = km1_i;
-ind2 = km2_i;
-mom = [init_set(ind1,1),init_set(ind1,2),init_set(ind1,3),init_set(ind1,4)];
-dad = [init_set(ind2,1),init_set(ind2,2),init_set(ind2,3),init_set(ind2,4)];
+% ind1 = km1_i;
+% ind2 = km2_i;
+% mom = [init_set(ind1,1),init_set(ind1,2),init_set(ind1,3),init_set(ind1,4)];
+% dad = [init_set(ind2,1),init_set(ind2,2),init_set(ind2,3),init_set(ind2,4)];
+mom = km1_dim;
+dad = km2_dim;
 par = [mean([mom;dad])];
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % [INPUT] Evolution Process
@@ -180,11 +182,18 @@ mmat = -dmat./(log(0.0001));
 parfor p = 1:num_pop
     % 1. Choose whether mutation is additive or subtractive (50/50 split)
     if rand > 0.5
-        dir = 1;
-        sign = 1;
+        dir1 = 1;
+        sign1 = 1;
     else
-        dir = 2;
-        sign = -1;
+        dir1 = 2;
+        sign1 = -1;
+    end
+    if rand > 0.5
+        dir2 = 1;
+        sign2 = 1;
+    else
+        dir2 = 2;
+        sign2 = -1;
     end
 
     % 2. Choose which two of the design variables to mutate
@@ -193,13 +202,13 @@ parfor p = 1:num_pop
      j = p_select(d_dist);
 
     % 3. Generate random variable according to exponential distribution
-    Ri = exprnd(mmat(dir,i));
-    Rj = exprnd(mmat(dir,j));
+    Ri = exprnd(mmat(dir1,i));
+    Rj = exprnd(mmat(dir2,j));
 
     % 4. Perform addition/subtraction to mutate
     par_temp = par;
-    par_temp(i) = par(i) + sign*Ri;
-    par_temp(j) = par(j) + sign*Rj;
+    par_temp(i) = par(i) + sign1*Ri;
+    par_temp(j) = par(j) + sign2*Rj;
 
     % 5. Add new mutation to mutation population
     for q = 1:4
@@ -209,12 +218,16 @@ parfor p = 1:num_pop
     % 6. Compute the fitness score of the new mutation
     mut_score(p) = fitness(par_temp,vp,struct_rocket,struct_atmo);
     
-    % 7. Check and replace if element is best performing so far
-    if init_score(i) > km2_s
-        if init_score(i) < km1_s
-            km2_s = init_score(i);
+end
+
+% iv) SELECTION (Post-mutation population) 
+% Finding best performing pair
+for i = 1:num_pop
+    if mut_score(i) > km2_s
+        if mut_score(i) < km1_s
+            km2_s = mut_score(i);
             km2_i = i;
-            km2_dim = X;
+            km2_dim = [mut_pop(i,1),mut_pop(i,2),mut_pop(i,3),mut_pop(i,4)];
         else
             tempi = km1_i;
             temps = km1_s;
@@ -222,23 +235,21 @@ parfor p = 1:num_pop
             km2_i = tempi;
             km2_s = temps;
             km2_dim = tempdim;
-            km1_s = init_score(i);
-            km1_i.km1 = i;
-            km1_dim = X;
+            km1_s =  mut_score(i);
+            km1_i = i;
+            km1_dim = [mut_pop(i,1),mut_pop(i,2),mut_pop(i,3),mut_pop(i,4)];
         end
     end
-    
 end
 
-% iv) SELECTION (Post-mutation population) 
 disp(mut_score);
-m_ind1 = p_select((mut_score));
-m_ind2 = p_select((mut_score));
-m_mom = [mut_pop(m_ind1,1),mut_pop(m_ind1,2),mut_pop(m_ind1,3),mut_pop(m_ind1,4)];
-m_dad = [mut_pop(m_ind2,1),mut_pop(m_ind2,2),mut_pop(m_ind2,3),mut_pop(m_ind2,4)];
-% Update parent dimensions
+% m_ind1 = km1_i;
+% m_ind2 = km2_i;
+% m_mom = [mut_pop(m_ind1,1),mut_pop(m_ind1,2),mut_pop(m_ind1,3),mut_pop(m_ind1,4)];
+% m_dad = [mut_pop(m_ind2,1),mut_pop(m_ind2,2),mut_pop(m_ind2,3),mut_pop(m_ind2,4)];
+% Update parent dimensions 
 p_par = par;
-par = [mean([m_mom;m_dad])];
+par = [mean([km1_dim;km2_dim])];
 fprintf('Evolution Fitness: %d \n',fitness(par,vp,struct_rocket,struct_atmo));
 
 % Check for convergence
@@ -311,13 +322,14 @@ function [score] = fitness(X,vp,str_r,str_a)
     
     f_drag = exp(expnt*(drag(X,vp,str_r,str_a)-73000));
     cop = CP_barrow(X,vp,str_r,str_a);
+    f_stab = 1;
     for i = 1:n
         margin = (cop*100-vp.altmachcg(i,2))/(D_nos*100);
         if margin < 2
             f_stab = 0;
             break;
-        elseif margin >= 2
-            f_stab = 1;
+%         else%if margin >= 2
+%             f_stab = 1;
         end
     end
     score = f_drag*f_stab;
@@ -361,7 +373,6 @@ function [Cd,Cd_incomp] = drag_OR(X,M,alt,str_r,str_a)
     tr = X(2)/X(1);
     MAC = X(1)*(2/3)*((1+tr+tr^2)/(1+tr)); % Is actually the MGC approximated to be MAC
 
-
     %Abody = 
     Aref = N*(F_w*X(4));
 
@@ -375,23 +386,23 @@ function [Cd,Cd_incomp] = drag_OR(X,M,alt,str_r,str_a)
     %Skin Friction Coefficients for Varying Regimes of Flow
     if Re < 10^4
         Cf = 1.48*(10^-2);
-    elseif Re < Rc
+    elseif Re <= Rc
         Cf = 1/((1.5*log(Re)-5.6)^2);
-    elseif Re > Rcm 
+    else %Re > Rc
         Cf = 0.032*((5*10^-6)/L_r)^0.2;
     end
     %Compressibility Corrections
     if V < Ma
         Cfc = Cf*(1-0.1*M^2);
-    elseif V > Ma
+    else%if V >= Ma
         turb = Cf/((1+0.15*M^2)^0.58);
         rough = Cf/(1+0.18*M^2);
         if Re < Rc
             Cfc = turb;
-        elseif Re > Rc
+        else%if Re > Rc
             if rough < turb
                 Cfc = turb;
-            elseif rough > turb
+            else%if rough > turb
                 Cfc = rough;
             end
         end
