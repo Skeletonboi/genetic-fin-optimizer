@@ -104,8 +104,8 @@ end
 % (3) Probabilistic best mean-of-two (selection prob. directly proportional
 % to set fitness score)
 
-ind1 = p_select(init_score.^3);
-ind2 = p_select(init_score.^3);
+ind1 = p_select(init_score);
+ind2 = p_select(init_score);
 mom = [init_set(ind1,1),init_set(ind1,2),init_set(ind1,3),init_set(ind1,4)];
 dad = [init_set(ind2,1),init_set(ind2,2),init_set(ind2,3),init_set(ind2,4)];
 par = [mean([mom;dad])];
@@ -128,10 +128,10 @@ while next
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Create randomized mutation population of parent dimensions (invoking 
 % exploration of domain space versus pure exploitation of good guesses)
-%
+% 
 % This step will require some fiddling (of hyperparameters such as method
 % of mutation) to acquire proper balance of exploitation-to-exploration.
-%
+% 
 % POSSIBLE IMPROVEMENT AVENUES: Mutation("learning") momentum (ie. in SGD
 % ), variable mutation rate, etc; These methods can help move the
 % convergence point out of local minima by initially overshooting them with
@@ -178,9 +178,9 @@ parfor p = 1:num_pop
     end
 
     % 2. Choose which two of the design variables to mutate
-    d_dist = [0.25,0.25,0.25,0.25];
-    i = p_select(d_dist);
-    j = p_select(d_dist);
+     d_dist = [0.25,0.25,0.25,0.25];
+     i = p_select(d_dist);
+     j = p_select(d_dist);
 
     % 3. Generate random variable according to exponential distribution
     Ri = exprnd(mmat(dir,i));
@@ -203,8 +203,8 @@ end
 
 % iv) SELECTION (Post-mutation population) 
 disp(mut_score);
-m_ind1 = p_select((mut_score).^3);
-m_ind2 = p_select((mut_score).^3);
+m_ind1 = p_select((mut_score));
+m_ind2 = p_select((mut_score));
 m_mom = [mut_pop(m_ind1,1),mut_pop(m_ind1,2),mut_pop(m_ind1,3),mut_pop(m_ind1,4)];
 m_dad = [mut_pop(m_ind2,1),mut_pop(m_ind2,2),mut_pop(m_ind2,3),mut_pop(m_ind2,4)];
 % Update parent dimensions
@@ -272,14 +272,15 @@ end
 function [score] = fitness(X,vp,str_r,str_a)
     % [INPUT] Set scoring function parameter by the 10th percentile;
     % ie. What drag should a score of 10% (out of 100%) be given to?
-    tenth = 50000; % This hyperparameter is completely arbitrary for now
-    expnt = (log(0.1))/tenth;
+   % tenth = 100000; % This hyperparameter is completely arbitrary for now
+   % expnt = (log(0.1))/tenth;
+   expnt = -0.001;
     
     % Calculate fitness score of fin-set dimensions
     D_nos = str_r(10).r;
     n = 6001;
     
-    f_drag = exp(expnt*drag(X,vp,str_r,str_a));
+    f_drag = exp(expnt*(drag(X,vp,str_r,str_a)-73000));
     cop = CP_barrow(X,vp,str_r,str_a);
     for i = 1:n
         margin = (cop*100-vp.altmachcg(i,2))/(D_nos*100);
