@@ -1,0 +1,13 @@
+Rocket Dimensions
+------------------
+Nosecone Length:
+Rocket Length:
+Rocket Diameter:
+Nose Base Diameter (if not the same as rocket diameter, specify):
+# of fins:
+Fin Thickness:
+
+End Diameter (@ end of boattail):
+Reduction Length @ Back (length of boattail):
+
+Centre of Gravity (from tip of nosecone):
