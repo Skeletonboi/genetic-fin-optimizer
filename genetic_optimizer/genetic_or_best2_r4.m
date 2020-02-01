@@ -28,17 +28,17 @@
 vp = load('altmachcg.mat') ;
 atm = load('atmostable.mat');
 
-L_n = 1.1;    %1. Nose Length
-L_r = 8.0;    %2. Rocket Length
-L_z = 0.30;   %3. Nozzle Length
+L_n = 0.5588;    %1. Nose Length
+L_r = 5.95122;    %2. Rocket Length
+L_z = 0.07366;   %3. Nozzle Length
 N = 4;          %4. # of fins
 Cn_n = 0.5;     %5. Nose Cone Coefficient
 t = 0.00635;    %6. Max Fin Root Thickness
 X_tc = 0.00635; %7. Distance from Fin Leading Edge to Max Thickness
 L_red = 0.08;%8. Length Reduction @ back
-D_noz = 0.10;%9. Nozzle Diameter
-D_nos = 0.30;  %10. Nose Base Diameter
-D_end = 0.24; %11. End Diameter
+D_noz = 0.062865*2;%9. Nozzle Diameter
+D_nos = 0.06985*2;  %10. Nose Base Diameter
+D_end = 0.062865*2; %11. End Diameter
 F_w = 0.006;  %12. Fin Width (Thickness)
 F_fl = 0.21895; %13. Fin Front Length
 
@@ -59,11 +59,22 @@ for n = 1:1
 % Initial Population Initialization
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 num_pop = 100;
-ub = 0.3;
-lb = 0;
-d = ub-lb;
-init_set = d.*rand(num_pop,4)+lb; % Initialize population of 4 independent variables
+aub = 0.9;
+bub = 0.9;
+mub = 0.9;
+sub = 0.2016;
+alb = 0;
+blb = 0.1016;
+mlb = 0;
+slb = 0;
+init_set = NaN(num_pop,4); % Initialize population of 4 independent variables
+init_set(:,1) = (aub-alb)*rand(num_pop,1)+alb;
+init_set(:,2) = (bub-blb)*rand(num_pop,1)+blb;
+init_set(:,3) = (mub-mlb)*rand(num_pop,1)+mlb;
+init_set(:,4) = (sub-slb)*rand(num_pop,1)+slb;
+%init_set = (aub-alb).*rand(num_pop,4)+alb;
 init_score = NaN(1,num_pop);
+
 km1_i = 0;
 km1_s = 0;
 km1_dim = [0,0,0,0];
@@ -166,14 +177,14 @@ km2_dim = [0,0,0,0];
 % mut_score = gpuArray(mut_score_cpu);
 
 % ii) Compute difference between existing parent values and UB/LB
-dau = ub-par(1);
-dal = par(1)-lb;
-dbu = ub-par(2);
-dbl = par(2)-lb;
-dmu = ub-par(3);
-dml = par(3)-lb;
-dsu = ub-par(4);
-dsl = par(4)-lb;
+dau = aub-par(1);
+dal = par(1)-alb;
+dbu = bub-par(2);
+dbl = par(2)-blb;
+dmu = mub-par(3);
+dml = par(3)-mlb;
+dsu = sub-par(4);
+dsl = par(4)-slb;
 dmat = [dau,dbu,dmu,dsu;dal,dbl,dml,dsl;];
 
 % iii) Compute the mean value of probability distribution for each diff.
@@ -285,20 +296,20 @@ fprintf('Evolution Fitness: %d \n',fitness(par,vp,struct_rocket,struct_atmo));
 % Check for convergence
 next = true;
 dims_converged = 0;
-for i = 1:4
-    if abs(p_par(i)-par(i)) < 0.0001
-        dims_converged = dims_converged + 1;
-    end
-    if dims_converged == 4
-        next = false;
-        fprintf('Converged, stopping evolution');
-    end
-end
+%for i = 1:4
+%    if abs(p_par(i)-par(i)) < 0.0001
+%        dims_converged = dims_converged + 1;
+%   end
+%    if dims_converged == 4
+%        next = false;
+%        fprintf('Converged, stopping evolution');
+%    end
+%end
 hold on
 x_bar = [0,par(3),par(3)+par(2),par(1)];
 y_bar = [0,par(4),par(4),0];
-xlim([0,0.8]);
-ylim([0,0.8]);
+xlim([0,2]);
+ylim([0,2]);
 plot(x_bar,y_bar);
 legend('a');
 end
@@ -351,18 +362,17 @@ function [score] = fitness(X,vp,str_r,str_a)
         if margin < 2
             f_stab = 0;
             break;
-%         else%if margin >= 2
-%             f_stab = 1;
         end
     end
     
     f_const = 1;
-    for j = 1:4
-        if X(j) > 0.3
-            f_const = 0;
-        end
-    end
-    if X(2) > (3/4)*X(1) || X(1) < 0.01 || X(4) < 0.01
+    %for j = 1:4
+    %    if X(j) > 0.3
+    %        f_const = 0;
+    %    end
+    %end
+    if X(2) > (3/4)*X(1) || X(1) < 0.01 || X(4) < 0.01 
+    %if  X(1) < 0.01 || X(4) < 0.01
         f_const = 0;
     end
     
