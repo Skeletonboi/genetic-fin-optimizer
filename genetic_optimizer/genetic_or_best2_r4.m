@@ -17,11 +17,11 @@
 % As such, this genetic algorithm aims to provide a certain degree of
 % randomization in the search area, which - when combined with multiple
 % variable initializations - will improve the confidence interval of a
-% mutually agreed optimal solution.
+% repeatedly found optimal solution.
 %
 % The optimizer must be given 1) rocket constants, 2) a target
 % stability caliber constraint, and optionally, 3) a manually-imposed 
-% inter-fin-dimensional constraint.
+% fin-dimension constraints.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Rocket/Atmospheric Constants Initialization
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -53,40 +53,43 @@ value_atmo = {rho,Ma,mu,nu};
 struct_rocket = struct("r",value_rocket);
 struct_atmo = struct("a",value_atmo);
 
-net_par = NaN(50,4);
+
 for n = 1:1
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Initial Population Initialization
+% Initial Population Initialization & Evaluation
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 num_pop = 100;
-aub = 0.9;
-bub = 0.9;
-mub = 0.9;
-sub = 0.2016;
-alb = 0;
-blb = 0.1016;
-mlb = 0;
-slb = 0;
-init_set = NaN(num_pop,4); % Initialize population of 4 independent variables
+aub = toMeters(12);
+bub = toMeters(12);
+mub = toMeters(12);
+sub = toMeters(6);
+alb = toMeters(0);
+blb = toMeters(0);
+mlb = toMeters(0);
+slb = toMeters(0);
+% Initialize pop. space of 4 fin dims.
+init_set = NaN(num_pop,4); 
+% Initializing each specimen's dimensions randomly (uniform dist.)
+% according to relative upper & lower bounds
 init_set(:,1) = (aub-alb)*rand(num_pop,1)+alb;
 init_set(:,2) = (bub-blb)*rand(num_pop,1)+blb;
 init_set(:,3) = (mub-mlb)*rand(num_pop,1)+mlb;
 init_set(:,4) = (sub-slb)*rand(num_pop,1)+slb;
 %init_set = (aub-alb).*rand(num_pop,4)+alb;
-init_score = NaN(1,num_pop);
-
+% Initialize space for population scores
+init_score = NaN(1,num_pop); 
+% Initialize space for best 2 specimens
 km1_i = 0;
 km1_s = 0;
 km1_dim = [0,0,0,0];
 km2_i = 0;
 km2_s = 0;
 km2_dim = [0,0,0,0];
-
-% Evaluating fitness scores for initialization set
+% Evaluating fitness scores for the population
 for i = 1:num_pop
     X = [init_set(i,1),init_set(i,2),init_set(i,3),init_set(i,4)];
     init_score(i) = fitness(X,vp,struct_rocket,struct_atmo);
-    % Keeping two highest scoring sets
+    % Keeping two highest scoring specimens
     if init_score(i) > km2_s
         if init_score(i) <= km1_s
             km2_s = init_score(i);
@@ -139,179 +142,184 @@ cei = 0;
 while next
     cei = cei + 1;
     fprintf('Current Evolution: %d \n',cei);
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Mutation Process
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Create randomized mutation population of parent dimensions (invoking 
-% exploration of domain space versus pure exploitation of good guesses)
-% 
-% This step will require some fiddling (of hyperparameters such as method
-% of mutation) to acquire proper balance of exploitation-to-exploration.
-% 
-% POSSIBLE IMPROVEMENT AVENUES: Mutation("learning") momentum (ie. in SGD
-% ), variable mutation rate, etc; These methods can help move the
-% convergence point out of local minima by initially overshooting them with
-% large learning/mutation rates to hopefully reach the global minimum.
-%
-% The chosen mutation algorithm chooses two random independent variables 
-%(out of the 4) to mutate. The mutation is accomplished by adding or
-% subtracting the existing value by a random variable whose value is 
-% bounded by the existing parent value and the upper/lower bound. The 
-% probability distribution of the random variable is an exponential
-% distribution; this distribution (hyperparameter) was chosen to be 
-% exponential as it results in a greater probability of the mutation to 
-% result with a value near the existing parent value. 
-% Again, this is decision is a hyperparameter, and can be tuned.
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % Mutation Process
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % Create randomized mutation population of parent dimensions (invoking 
+    % exploration of domain space versus pure exploitation of good guesses)
+    % 
+    % This step will require some fiddling (of hyperparameters such as method
+    % of mutation) to acquire proper balance of exploitation-to-exploration.
+    % 
+    % POSSIBLE IMPROVEMENT AVENUES: Mutation("learning") momentum (ie. in SGD
+    % ), variable mutation rate, etc; These methods can help move the
+    % convergence point out of local minima by initially overshooting them with
+    % large learning/mutation rates to hopefully reach the global minimum.
+    %
+    % The chosen mutation algorithm chooses two random independent variables 
+    %(out of the 4) to mutate. The mutation is accomplished by adding or
+    % subtracting the existing value by a random variable whose value is 
+    % bounded by the existing parent value and the upper/lower bound. The 
+    % probability distribution of the random variable is an exponential
+    % distribution; this distribution (hyperparameter) was chosen to be 
+    % exponential as it results in a greater probability of the mutation to 
+    % result with a value near the existing parent value. 
+    % Again, this is decision is a hyperparameter, and can be tuned.
 
-% i) Initialize space for mutation population
-mut_pop = zeros(num_pop,4);
-mut_score = zeros(num_pop,1);
+    % i) Initialize space for mutation population
+    mut_pop = zeros(num_pop,4);
+    mut_score = zeros(num_pop,1);
 
-km1_i = 0;
-km1_s = 0;
-km1_dim = [0,0,0,0];
-km2_i = 0;
-km2_s = 0;
-km2_dim = [0,0,0,0];
-% mut_pop = gpuArray(mut_pop_cpu);
-% mut_score = gpuArray(mut_score_cpu);
+    km1_i = 0;
+    km1_s = 0;
+    km1_dim = [0,0,0,0];
+    km2_i = 0;
+    km2_s = 0;
+    km2_dim = [0,0,0,0];
+    % mut_pop = gpuArray(mut_pop_cpu);
+    % mut_score = gpuArray(mut_score_cpu);
 
-% ii) Compute difference between existing parent values and UB/LB
-dau = aub-par(1);
-dal = par(1)-alb;
-dbu = bub-par(2);
-dbl = par(2)-blb;
-dmu = mub-par(3);
-dml = par(3)-mlb;
-dsu = sub-par(4);
-dsl = par(4)-slb;
-dmat = [dau,dbu,dmu,dsu;dal,dbl,dml,dsl;];
+    % ii) Compute difference between existing parent values and UB/LB
+    dau = aub-par(1);
+    dal = par(1)-alb;
+    dbu = bub-par(2);
+    dbl = par(2)-blb;
+    dmu = mub-par(3);
+    dml = par(3)-mlb;
+    dsu = sub-par(4);
+    dsl = par(4)-slb;
+    dmat = [dau,dbu,dmu,dsu;dal,dbl,dml,dsl];
 
-% iii) Compute the mean value of probability distribution for each diff.
-mmat = -dmat./(log(0.0001));
+    % iii) Compute the mean value of probability distribution for each diff.
+    mmat = -dmat./log(0.0001);
 
-parfor p = 1:num_pop
-    % 1. Choose whether mutation is additive or subtractive (50/50 split)
-    if rand > 0.5
-        dir1 = 1;
-        sign1 = 1;
-    else
-        dir1 = 2;
-        sign1 = -1;
-    end
-    if rand > 0.5
-        dir2 = 1;
-        sign2 = 1;
-    else
-        dir2 = 2;
-        sign2 = -1;
-    end
-    if rand > 0.5
-        dir3 = 1;
-        sign3 = 1;
-    else
-        dir3 = 2;
-        sign3 = -1;
-    end
-    if rand > 0.5
-        dir4 = 1;
-        sign4 = 1;
-    else
-        dir4 = 2;
-        sign4 = -1;
-    end
-
-
-    % 2. Choose which two of the design variables to mutate
-%      d_dist = [0.25,0.25,0.25,0.25];
-%      i = p_select(d_dist);
-%      j = p_select(d_dist);
-
-    % 3. Generate random variable according to exponential distribution
-    R1 = exprnd(mmat(dir1,1));
-    R2 = exprnd(mmat(dir2,2));
-    R3 = exprnd(mmat(dir3,3));
-    R4 = exprnd(mmat(dir4,4));
-
-    % 4. Perform addition/subtraction to mutate
-    par_temp = par;
-    par_temp(1) = par(1) + sign1*R1;
-    par_temp(2) = par(2) + sign2*R2;
-    par_temp(3) = par(3) + sign3*R3;
-    par_temp(4) = par(4) + sign3*R4;
-
-    % 5. Add new mutation to mutation population
-    for q = 1:4
-        mut_pop(p,q) = par_temp(q);
-    end
-    
-    % 6. Compute the fitness score of the new mutation
-    mut_score(p) = fitness(par_temp,vp,struct_rocket,struct_atmo);
-    
-end
-
-% iv) SELECTION (Post-mutation population) 
-% Finding best performing pair
-for i = 1:num_pop
-    if mut_score(i) > km2_s
-        if mut_score(i) < km1_s
-            km2_s = mut_score(i);
-            km2_i = i;
-            km2_dim = [mut_pop(i,1),mut_pop(i,2),mut_pop(i,3),mut_pop(i,4)];
+    parfor p = 1:num_pop
+        % 1. Choose whether mutation is additive or subtractive (50/50 split)
+        if rand > 0.5
+            dir1 = 1;
+            sign1 = 1;
         else
-            tempi = km1_i;
-            temps = km1_s;
-            tempdim = km1_dim;
-            km2_i = tempi;
-            km2_s = temps;
-            km2_dim = tempdim;
-            km1_s =  mut_score(i);
-            km1_i = i;
-            km1_dim = [mut_pop(i,1),mut_pop(i,2),mut_pop(i,3),mut_pop(i,4)];
+            dir1 = 2;
+            sign1 = -1;
+        end
+        if rand > 0.5
+            dir2 = 1;
+            sign2 = 1;
+        else
+            dir2 = 2;
+            sign2 = -1;
+        end
+        if rand > 0.5
+            dir3 = 1;
+            sign3 = 1;
+        else
+            dir3 = 2;
+            sign3 = -1;
+        end
+        if rand > 0.5
+            dir4 = 1;
+            sign4 = 1;
+        else
+            dir4 = 2;
+            sign4 = -1;
+        end
+
+        % 2. Choose which two of the design variables to mutate
+    %      d_dist = [0.25,0.25,0.25,0.25];
+    %      i = p_select(d_dist);
+    %      j = p_select(d_dist);
+
+        % 3. Generate random pertubation according to bounded exponential dist.
+        pert_a = exprnd(mmat(dir1,1));
+        pert_b = exprnd(mmat(dir2,2));
+        pert_m = exprnd(mmat(dir3,3));
+        pert_s = exprnd(mmat(dir4,4));
+        % 3. Generate random pertubation according to bounded uniform dist.
+%         decay = 1/log(cei);
+%         pert_a = rand*dmat(dir1,1)*decay;
+%         pert_b = rand*dmat(dir2,2)*decay;
+%         pert_m = rand*dmat(dir3,3)*decay;
+%         pert_s = rand*dmat(dir4,4)*decay;
+
+
+        % 4. Perform addition/subtraction to mutate
+        par_new = par;
+        par_new(1) = par(1) + sign1*pert_a;
+        par_new(2) = par(2) + sign2*pert_b;
+        par_new(3) = par(3) + sign3*pert_m;
+        par_new(4) = par(4) + sign3*pert_s;
+        % 5. Add new mutation to mutation population
+        for q = 1:4
+            mut_pop(p,q) = par_new(q);
+        end
+
+        % 6. Compute the fitness score of the new mutation
+        mut_score(p) = fitness(par_new,vp,struct_rocket,struct_atmo);
+
+    end
+
+    % iv) SELECTION (Post-mutation population) 
+    % Finding best performing pair
+    for i = 1:num_pop
+        if mut_score(i) > km2_s
+            if mut_score(i) < km1_s
+                km2_s = mut_score(i);
+                km2_i = i;
+                km2_dim = [mut_pop(i,1),mut_pop(i,2),mut_pop(i,3),mut_pop(i,4)];
+            else
+                tempi = km1_i;
+                temps = km1_s;
+                tempdim = km1_dim;
+                km2_i = tempi;
+                km2_s = temps;
+                km2_dim = tempdim;
+                km1_s =  mut_score(i);
+                km1_i = i;
+                km1_dim = [mut_pop(i,1),mut_pop(i,2),mut_pop(i,3),mut_pop(i,4)];
+            end
         end
     end
-end
 
-disp(mut_score);
-% m_ind1 = km1_i;
-% m_ind2 = km2_i;
-% m_mom = [mut_pop(m_ind1,1),mut_pop(m_ind1,2),mut_pop(m_ind1,3),mut_pop(m_ind1,4)];
-% m_dad = [mut_pop(m_ind2,1),mut_pop(m_ind2,2),mut_pop(m_ind2,3),mut_pop(m_ind2,4)];
-% Update parent dimensions IFF new parent is better than previous parent
-%p_par = par;
-m_par = [mean([km1_dim;km2_dim])]; % Temporary new mutated parent (for checking)
+    disp(mut_score);
+    % m_ind1 = km1_i;
+    % m_ind2 = km2_i;
+    % m_mom = [mut_pop(m_ind1,1),mut_pop(m_ind1,2),mut_pop(m_ind1,3),mut_pop(m_ind1,4)];
+    % m_dad = [mut_pop(m_ind2,1),mut_pop(m_ind2,2),mut_pop(m_ind2,3),mut_pop(m_ind2,4)];
+    % Update parent dimensions IFF new parent is better than previous parent
+    %p_par = par;
+    m_par = mean([km1_dim;km2_dim]); % Temporary new mutated parent (for checking)
 
-if cei > 5
-    if fitness(m_par,vp,struct_rocket,struct_atmo) > fitness(p_par,vp,struct_rocket,struct_atmo)
+    if cei > 5
+        if fitness(m_par,vp,struct_rocket,struct_atmo) > fitness(p_par,vp,struct_rocket,struct_atmo)
+            p_par = par;
+            par = m_par; % Establish as new mutated parent
+        end
+    else
         p_par = par;
-        par = m_par; % Establish as new mutated parent
+        par = m_par;
     end
-else
-    p_par = par;
-    par = m_par;
-end
 
-fprintf('Evolution Fitness: %d \n',fitness(par,vp,struct_rocket,struct_atmo));
+    fprintf('Evolution Fitness: %d \n',fitness(par,vp,struct_rocket,struct_atmo));
 
-% Check for convergence
-next = true;
-dims_converged = 0;
-%for i = 1:4
-%    if abs(p_par(i)-par(i)) < 0.0001
-%        dims_converged = dims_converged + 1;
-%   end
-%    if dims_converged == 4
-%        next = false;
-%        fprintf('Converged, stopping evolution');
-%    end
-%end
-hold on
-x_bar = [0,par(3),par(3)+par(2),par(1)];
-y_bar = [0,par(4),par(4),0];
-xlim([0,2]);
-ylim([0,2]);
-plot(x_bar,y_bar);
-legend('a');
+    % Check for convergence
+    next = true;
+    dims_converged = 0;
+    %for i = 1:4
+    %    if abs(p_par(i)-par(i)) < 0.0001
+    %        dims_converged = dims_converged + 1;
+    %   end
+    %    if dims_converged == 4
+    %        next = false;
+    %        fprintf('Converged, stopping evolution');
+    %    end
+    %end
+    hold on
+    x_bar = [0,par(3),par(3)+par(2),par(1)];
+    y_bar = [0,par(4),par(4),0];
+    xlim([0,2]);
+    ylim([0,2]);
+    plot(x_bar,y_bar);
+    legend('a');
 end
 
 end
@@ -371,8 +379,7 @@ function [score] = fitness(X,vp,str_r,str_a)
     %        f_const = 0;
     %    end
     %end
-    if X(2) > (3/4)*X(1) || X(1) < 0.01 || X(4) < 0.01 
-    %if  X(1) < 0.01 || X(4) < 0.01
+    if  X(1) < 0.01 || X(4) < 0.01 %X(2)<0.75*X(1)|| X(1)-(X(3)+X(2)) > 5 || X(1)-(X(3)+X(2)) < 3
         f_const = 0;
     end
     
@@ -397,6 +404,9 @@ for i = 1:2:n-2
     a = a + da;
 end
 
+end
+function m = toMeters(in)
+    m = in*0.0254;
 end
 function [Cd,Cd_incomp] = drag_OR(X,M,alt,str_r,str_a)
     % Interference Drag and Fin-Tip Vortices are ignored as they are 
